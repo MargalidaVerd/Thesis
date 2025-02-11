@@ -1,0 +1,76 @@
+---
+title: "MapsEurope"
+format: html
+editor: visual
+Rendering:
+  embed-resources: true
+---
+
+# Maps of Europe
+
+```{r}
+library(tidyverse)
+library(eurostat)
+library(leaflet)
+library(sf)
+library(scales)
+library(cowplot)
+library(ggthemes)
+library(giscoR)
+library(rnaturalearth)
+```
+
+```{r}
+world_map <- ne_countries(scale = 50, returnclass = 'sf')
+```
+
+```{r}
+world_map %>% 
+  ggplot() +
+  geom_sf() 
+```
+
+```{r}
+world_map %>% 
+  ggplot() +
+  geom_sf() +
+  scale_x_continuous(limits = c(-20, 35)) +
+  scale_y_continuous(limits = c(35, 70))
+```
+
+## Cargar datos
+
+```{r}
+mortality <- read_csv("https://raw.githubusercontent.com/MargalidaVerd/TFG/main/mortality.csv")
+```
+
+```{r}
+europeanUnion <- c("Austria","Belgium","Bulgaria","Croatia","Cyprus",
+                   "Czech Rep.","Denmark","Estonia","Finland","France",
+                   "Germany","Greece","Hungary","Ireland","Italy","Latvia",
+                   "Lithuania","Luxembourg","Malta","Netherlands","Poland",
+                   "Portugal","Romania","Slovakia","Slovenia","Spain",
+                   "Sweden", "United Kingdom", "Iceland", "Switzerland",
+                   "Czechia", "Turkey")
+
+SHP_1 <-world_map %>%
+  filter(name %in% europeanUnion) %>% 
+  select(adm0_a3, name) %>% 
+  left_join(mortality, by = c("adm0_a3"="Country Code")) 
+
+SHP_1$`Death rate per 100 000 population` = as.numeric(gsub(",","", SHP_1$`Death rate per 100 000 population`))
+```
+
+```{r}
+SHP_1 %>% filter(Year=="2011", Sex=="All") %>% ggplot(aes(fill=Number))+geom_sf() +
+  scale_x_continuous(limits = c(-25, 35)) +
+  scale_y_continuous(limits = c(35, 75))+
+  scale_fill_gradient(name="Number of Deaths", low="white",high="red")
+```
+
+```{r}
+SHP_2 <- st_transform(SHP_1, 'EPSG:3082')
+SHP_2 %>% filter(Year=="2011", Sex=="All") %>% ggplot(aes(fill=Number))+
+  geom_sf(xlim=c(5067987, 18463513), ylim=c(10296403,14705317 )) +
+  scale_fill_continuous(name="Number of Deaths")
+```
