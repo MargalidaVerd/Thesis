@@ -5,6 +5,8 @@ format: html
 editor: visual
 ---
 
+## Installing data and packages
+
 ```{r, warning=FALSE, message=FALSE}
 
 # packages loading
@@ -14,10 +16,22 @@ library(readr)
 library(dplyr)
 library(zoo)
 library(feasts)
+library(eurostat)
+library(leaflet)
+library(sf)
+library(scales)
+library(cowplot)
+library(ggthemes)
+library(giscoR)
+library(rnaturalearth)
+library(ggplot2)
+library(sf)
+library(dplyr)
+
 
 # data loading
 
-tb_treatment <- read.csv("tub_treatment.csv", header = TRUE, colClasses = c("character", "character", "integer", "double", "double", "double")) # Dataset including new TB cases
+#tb_treatment <- read.csv("tub_treatment.csv", header = TRUE, colClasses = c("character", "character", "integer", "double", "double", "double")) # Dataset including new TB cases 
 
 
 mortality <- read.csv("mortality.csv", header = TRUE, colClasses = c("character","character","character","character","double","character","character","character","double","double","double","double"), row.names = NULL) # Dataset including Number of deaths
@@ -26,21 +40,23 @@ colnames(mortality) <- colnames(mortality)[2:ncol(mortality)]
 mortality <- mortality[1:(ncol(mortality)-1)]
 
 population <- read.csv("population.csv", header = TRUE)
-head(population) # We only need the population variable of this dataset
+#head(population) # We only need the population variable of this dataset
 
 gdp_per_capita <- read.csv("gdp_per_capita.csv", header = TRUE)
-head(gdp_per_capita) # Dataset including gdp per capita of each country
+#head(gdp_per_capita) # Dataset including gdp per capita of each country
 # data bank
 
 ```
 
 ```{r}
-# change of the variables names
+# renaming variables
 
+"""
 tb_treatment <- tb_treatment %>% 
   rename(Country_Name = Entity, Country_Code = Code, New_TB_Cases = Treatment.success.rate..new.TB.cases, Treatment_MDR_TB = Treatment.success.rate.for.patients.treated.for.MDR.TB...., Treatment_XDR_TB = Treatment.success.rate..XDR.TB.cases  ) %>% 
   select(1:4) %>% 
   glimpse()
+"""
 
 mortality <- mortality %>%  
   rename(Number_Deaths = Number, Percent_CS_Death = Percentage.of.cause.specific.deaths.out.of.total.deaths, Age_Death_Rate = Age.standardized.death.rate.per.100.000.standard.population, Death_Rate = Death.rate.per.100.000.population, Country_Name = Country.Name,Country_Code = Country.Code, Region_Code = Region.Code, Region_Name = Region.Name) %>% 
@@ -54,6 +70,7 @@ population <- population %>%
 gdp_per_capita <- gdp_per_capita %>% 
   select(3,4,5,7) %>% 
   rename(Country_Name = Country.Name, Country_Code = Country.Code, Year = Time, GDP_capita = Value)
+
 ```
 
 ```{r}
@@ -63,6 +80,7 @@ mortality <- mortality %>%
   dplyr::filter(Sex == "All") 
 
 # Delete age variables
+
 mortality <- mortality %>% 
   select(1:5,9:12)
 ```
@@ -70,27 +88,26 @@ mortality <- mortality %>%
 ```{r}
 # joins
 
-mortality_and_population <- mortality %>% 
+total <- mortality %>% 
   left_join(population, by=c("Country_Name", "Year")) %>% 
-  dplyr::filter(Region_Code=="EU")
+  left_join(gdp_per_capita, by = c("Country_Code", "Year")) %>% 
+  dplyr::filter(Region_Code=="EU") %>% 
+  select(1:10,12) %>% 
+  rename(Country_Name = Country_Name.x)
 
+head(total)
+
+
+"""
 mortality_complete <- mortality_and_population %>% 
-  left_join(gdp_per_capita, by = c("Country_Code", "Year")) 
-
+ left_join(gdp_per_capita, by = c("Country_Code", "Year")) 
 mortality_complete <- mortality_complete %>% 
   select(1:10,12)
-
-
 total <- mortality_complete %>% 
   left_join(tb_treatment %>% dplyr::select(-Country_Name),
                                  by=c("Country_Code", "Year")) %>% 
   dplyr::filter(Region_Code=="EU")
-
-# Final dataset
-
-total <- total %>% 
-  rename(Country_Name = Country_Name.x)
-
+"""
 
 
 ```
@@ -101,7 +118,6 @@ First, we will define the criteria used to divide European countries into six di
 
 ```{r}
 
-unique(total$Country_Name)
 
 northern_europe_countries <- total %>% 
   filter(Country_Name %in% c("Iceland", "Norway", "Sweden", "Finland", "Denmark"))
@@ -141,18 +157,6 @@ total <- total %>%
 ```
 
 ```{r}
-library(eurostat)
-library(leaflet)
-library(sf)
-library(scales)
-library(cowplot)
-library(ggthemes)
-library(giscoR)
-library(rnaturalearth)
-library(ggplot2)
-library(sf)
-library(dplyr)
-
 # Load world map with country boundaries
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
@@ -299,7 +303,6 @@ plot_netherlands, nrow = 3)
 
 plot_romania
 ```
-
 
 ## Detrending time series: differentiation
 
@@ -577,9 +580,6 @@ switzerland_pacf <- switzerland_data %>%
 grid.arrange(spain_pacf, iceland_pacf, lithuania_pacf, netherlands_pacf, romania_pacf, switzerland_pacf, ncol = 2, nrow = 3)
 ```
 
-
-
-
 ## Time series decomposition
 
 If we assume an additive decomposition, then we can write $$y_t = S_t +T_t +R_t,$$ where $y_t$ is the data, $S_t$ is the seasonal component, $T_t$ is the trend-cycle component and $R_t$ is the remainder component, all at period $t$.
@@ -657,6 +657,7 @@ grid.arrange(b1,b2,b3,b4,b5,b6, nrow = 2)
 b6
 
 ```
+
 ## Non-seasonal ARIMA models
 
 ARIMA(p,d,q) model where:
