@@ -7,7 +7,15 @@ editor: visual
 
 ## Installing data and packages
 
-```{r, warning=FALSE, message=FALSE}
+First, we will install and load the necessary packages for this study. Additionally, we will load the required datasets. The analysis is based on three datasets:  
+
+- **Mortality**: Downloaded from the World Health Organization, this is the primary dataset for the analysis. It contains the number of tuberculosis-related deaths in all countries. However, our study will focus solely on European countries.  
+
+- **Population**: From this dataset, we will extract only the population variable. The source of this data is *Our World in Data*.  
+
+- **GDP per capita**: Similar to the population dataset, we will extract only the *gdp_per_capita* variable. The source of this data is *Data Bank*.  
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 # packages loading
 
@@ -27,53 +35,75 @@ library(rnaturalearth)
 library(ggplot2)
 library(sf)
 library(dplyr)
+library(gridExtra)
+library(tsibble)
 
+
+```
+
+Let's examine the structure of the datasets:
+
+1. Mortality: 
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 # data loading
 
-#tb_treatment <- read.csv("tub_treatment.csv", header = TRUE, colClasses = c("character", "character", "integer", "double", "double", "double")) # Dataset including new TB cases 
-
-
-mortality <- read.csv("mortality.csv", header = TRUE, colClasses = c("character","character","character","character","double","character","character","character","double","double","double","double"), row.names = NULL) # Dataset including Number of deaths
+mortality <- read.csv("mortality.csv", header = TRUE, colClasses = c("character","character","character","character","double","character","character","character","double","double","double","double"), row.names = NULL) 
 
 colnames(mortality) <- colnames(mortality)[2:ncol(mortality)]
 mortality <- mortality[1:(ncol(mortality)-1)]
 
+mortality %>% 
+  glimpse()
+```
+2. Population
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 population <- read.csv("population.csv", header = TRUE)
-#head(population) # We only need the population variable of this dataset
 
-gdp_per_capita <- read.csv("gdp_per_capita.csv", header = TRUE)
-#head(gdp_per_capita) # Dataset including gdp per capita of each country
-# data bank
-
+population %>% 
+  glimpse()
 ```
 
-```{r}
+3. gdp_per_capita
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+gdp_per_capita <- read.csv("gdp_per_capita.csv", header = TRUE)
+
+gdp_per_capita %>% 
+  glimpse()
+```
+
+## Cleaning data
+
+As seen, we need to standardize the variables names to merge the tables. 
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 # renaming variables
 
-"""
-tb_treatment <- tb_treatment %>% 
-  rename(Country_Name = Entity, Country_Code = Code, New_TB_Cases = Treatment.success.rate..new.TB.cases, Treatment_MDR_TB = Treatment.success.rate.for.patients.treated.for.MDR.TB...., Treatment_XDR_TB = Treatment.success.rate..XDR.TB.cases  ) %>% 
-  select(1:4) %>% 
-  glimpse()
-"""
+print("Mortality")
 
 mortality <- mortality %>%  
   rename(Number_Deaths = Number, Percent_CS_Death = Percentage.of.cause.specific.deaths.out.of.total.deaths, Age_Death_Rate = Age.standardized.death.rate.per.100.000.standard.population, Death_Rate = Death.rate.per.100.000.population, Country_Name = Country.Name,Country_Code = Country.Code, Region_Code = Region.Code, Region_Name = Region.Name) %>% 
-  glimpse() #WHO
+  glimpse() 
 
+print("Population")
 population <- population %>% 
   rename(Population = Population...Sex..all...Age..all...Variant..estimates, Country_Name = Entity) %>% 
-  glimpse() #our world in data
+  glimpse() 
 
-
+print("gdp_per_capita")
 gdp_per_capita <- gdp_per_capita %>% 
   select(3,4,5,7) %>% 
-  rename(Country_Name = Country.Name, Country_Code = Country.Code, Year = Time, GDP_capita = Value)
+  rename(Country_Name = Country.Name, Country_Code = Country.Code, Year = Time, GDP_capita = Value) %>% 
+  glimpse()
 
 ```
+The next step is to select the variables of study of the mortality dataset. We will exclude `Sex`, `Age.group.code` and `Age.group`.
 
-```{r}
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 # Select rows of interest in the mortality dataset
 
 mortality <- mortality %>% 
@@ -82,10 +112,13 @@ mortality <- mortality %>%
 # Delete age variables
 
 mortality <- mortality %>% 
-  select(1:5,9:12)
+  select(1:5,9:12) %>% 
+  glimpse()
 ```
 
-```{r}
+Now, we can join the other two datasets:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 # joins
 
 total <- mortality %>% 
@@ -93,55 +126,18 @@ total <- mortality %>%
   left_join(gdp_per_capita, by = c("Country_Code", "Year")) %>% 
   dplyr::filter(Region_Code=="EU") %>% 
   select(1:10,12) %>% 
-  rename(Country_Name = Country_Name.x)
+  rename(Country_Name = Country_Name.x) 
 
-head(total)
-
-
-"""
-mortality_complete <- mortality_and_population %>% 
- left_join(gdp_per_capita, by = c("Country_Code", "Year")) 
-mortality_complete <- mortality_complete %>% 
-  select(1:10,12)
-total <- mortality_complete %>% 
-  left_join(tb_treatment %>% dplyr::select(-Country_Name),
-                                 by=c("Country_Code", "Year")) %>% 
-  dplyr::filter(Region_Code=="EU")
-"""
-
+total %>% 
+  glimpse()
 
 ```
 
 ## Chosen countries
 
-First, we will define the criteria used to divide European countries into six distinct regions: North, South, West, East, Central, and the Balkans. The Balkans have been included as a separate region due to their significant cultural differences from neighboring countries. The map below shows the division that would be used from this point forward.
+First, we will define the criteria for dividing European countries into six distinct regions: North, South, West, East, Central, and the Balkans. The Balkans have been designated as a separate region due to their significant cultural differences from neighboring countries. We will add a new variable to the dataset that specifies the subregion to which each country belongs.
 
-```{r}
-
-
-northern_europe_countries <- total %>% 
-  filter(Country_Name %in% c("Iceland", "Norway", "Sweden", "Finland", "Denmark"))
-         
-
-southern_europe_countries <- total %>% 
-  filter(Country_Name %in% c("Spain", "Portugal", "Italy", "Malta", "Greece"))
-         
-         
-western_europe_countries <- total %>% 
-  filter(Country_Name %in% c("France", "Netherlands", "Belgium", "United Kingdom of Great Britain and Northern Ireland", "Ireland"))
-
-
-eastern_europe_countries <- total %>% 
-  filter(Country_Name %in% c("Russian Federation", "Estonia", "Latvia", "Lithuania", "Belarus", "Ukraine", "Moldova"))
-
-bankal_countries <- total %>% 
-  filter(Country_Name %in% c("Albania", "Bulgaria", "Romania", "Bosnia and Herzegovina", 
-                "North Macedonia", "Croatia", "Serbia", "Montenegro", "Slovenia"))
-
-central_europe_countries <- total %>% 
-  filter(Country_Name %in% c("Germany", "Poland", "Czechia", "Slovakia", "Hungary", 
-                "Switzerland", "Austria", "Luxembourg"))
-
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 total <- total %>%
   mutate(Subregion = case_when(
@@ -156,19 +152,15 @@ total <- total %>%
 
 ```
 
-```{r}
+The map below shows the division that would be used from this point forward.
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 # Load world map with country boundaries
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
 # Filter only European countries
 europe <- world %>% filter(continent == "Europe")
 
-# Europe
-world %>% 
-  ggplot() +
-  geom_sf() +
-  scale_x_continuous(limits = c(-20, 35)) +
-  scale_y_continuous(limits = c(35, 70))
 
 # Define the classification
 europe <- europe %>%
@@ -188,12 +180,12 @@ europe <- europe %>%
 ggplot(data = europe) +
   geom_sf(aes(fill = Subregion), color = "black") +
   scale_fill_manual(values = c(
-    "N" = "#377EB8",  # Strong Blue  
-    "S" = "#E41A1C",  # Bold Red  
-    "W" = "#4DAF4A",  # Deep Green  
-    "E" = "#FF7F00",  # Vivid Orange  
-    "C" = "#984EA3",  # Dark Purple  
-    "B" = "#FFFF33"   # Bright Yellow  
+    "N" = "#377EB8",    
+    "S" = "#E41A1C",    
+    "W" = "#4DAF4A",    
+    "E" = "#FF7F00",   
+    "C" = "#984EA3",    
+    "B" = "#FFFF33"    
   )) + scale_x_continuous(limits = c(-20, 35)) +
   scale_y_continuous(limits = c(35, 70)) +
   theme_minimal() +
@@ -206,7 +198,7 @@ We are considering Greece as part of the Southern region due to the cultural dif
 
 As a first step, we will address any missing values (NA) in the dataset for the variable Number_Deaths in each selected country. We are going to choose countries that at least have 40 years with data.
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 total %>% 
   dplyr::select(Country_Name, Number_Deaths) %>% 
@@ -233,10 +225,10 @@ Lets study each subregion:
 
 -   **Balkans region**. For the Balkans region, we have selected Romania, which has 60 recorded values. It will be an interesting case of analysis due to its tendency, that is a bit different as the other countries.
 
-The selection criteria prioritize minimizing the number of missing values (NA) while ensuring a diverse representation of different regions in Europe. As we have talked about tendencies, lets show the chosen countries tendency on the number of Tuberculosis deaths.
+The selection criteria prioritize minimizing the number of missing values (NA) while ensuring a diverse representation of different regions in Europe. As we have discussed trends, let's display the trend in tuberculosis-related deaths for the selected countries.
 
-```{r}
-library(gridExtra)
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
 
 chosen_countries <- total %>% 
   select(Country_Name, Year, Number_Deaths) 
@@ -253,146 +245,191 @@ chosen_countries %>%
     "Lithuania" = "#FF7F00",   
     "Switzerland" = "#984EA3",   
     "Romania" = "#FFFF33"
-  ))
+  )) + 
+  theme_minimal() +
+  labs(title = "Chosen countries tuberculosis-related deaths trends") +
+  theme(legend.position = "right")
 
 
 plot_spain <- chosen_countries %>% 
   filter(Country_Name == "Spain") %>%  
   ggplot(aes(x = Year, y = Number_Deaths)) +  
   geom_line() +
-  labs(title = "Evolution of Number of Deaths in Spain") 
+  labs(title = "Spain") 
 
 plot_iceland <- chosen_countries %>% 
   filter(Country_Name == "Iceland") %>%  
   ggplot(aes(x = Year, y = Number_Deaths)) +  
   geom_line() +
-  labs(title = "Evolution of Number of Deaths in Iceland") 
+  labs(title = "Iceland") 
 
 plot_netherlands <- chosen_countries %>% 
   filter(Country_Name == "Netherlands") %>%  
   ggplot(aes(x = Year, y = Number_Deaths)) +  
   geom_line() +
-  labs(title = "Evolution of Number of Deaths in Netherlands") 
+  labs(title = "Netherlands") 
 
 plot_romania <- chosen_countries %>% 
   filter(Country_Name == "Romania") %>%  
   ggplot(aes(x = Year, y = Number_Deaths)) +  
   geom_line() +
-  labs(title = "Evolution of Number of Deaths in Romania") 
+  labs(title = "Romania") 
 
 plot_lithuania <- chosen_countries %>% 
   filter(Country_Name == "Lithuania") %>%  
   ggplot(aes(x = Year, y = Number_Deaths)) +  
   geom_line() +
-  labs(title = "Evolution of Number of Deaths in Lithuania") 
+  labs(title = "Lithuania") 
 
 
 plot_switzerland <- chosen_countries %>% 
   filter(Country_Name == "Switzerland") %>%  
   ggplot(aes(x = Year, y = Number_Deaths)) +  
   geom_line() +
-  labs(title = "Evolution of Number of Deaths in Switzerland") 
+  labs(title = "Switzerland") 
 
 
-grid.arrange(plot_spain,
-plot_switzerland,
-plot_iceland,
-plot_lithuania,
-plot_romania,
-plot_netherlands, nrow = 3)
+grid.arrange(plot_spain, plot_switzerland, plot_iceland, plot_lithuania, plot_romania, plot_netherlands, nrow = 3)
 
-plot_romania
 ```
 
-## Detrending time series: differentiation
 
-As seen, the series present a hard tendency; in order to apply ARIMA models, we need to differentiate them to detrend them. We will use the `diff` function.
+## Detrending series
 
-```{r}
 
-## Spain detrending
 
-spain_detrending_data <- total %>% 
+As we saw in the previous section, developed countries exhibit a noticeable downward trend. To apply an ARIMA model, it is essential to work with a stationary time series, meaning data should not have any trend. The goal now is to detrend those series (Spain, Iceland, Netherlands and Switzerland).
+
+$The following regression model was applied:
+
+$$\ln(Number\_Deaths)= \ln(\beta_0)-\beta_1 \cdot \text{Year} + \ln(u_t),$$
+where $u_t$ represents the residuals term. We will use the function `lm` for the regression. We begin our study with Spain data. The estimated coefficients are as follows:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+# Spain 
+
+spain_data <- total %>% 
   filter(Country_Name == "Spain") %>% 
-  arrange(Year) %>% 
-  select(Number_Deaths) 
-  
+  select(Year, Number_Deaths)
 
-spain.ts = ts(spain_detrending_data, start = c(1951,1), end = c(2021,1), frequency = 1)
-spain.ts
-plot(spain.ts)
-acf(spain.ts)
 
-spain_detrended = diff(spain.ts, differences = 1)
-par(mfrow=c(1,2))
-plot.ts(spain_detrended)
-acf(spain_detrended)
+modSpain <- lm(log(Number_Deaths)~Year, data=spain_data)
+summary(modSpain)
+
+```
+- Intercept: p-value < $2.2e-16$ indicates it is a significant baseline value.
+- Year coefficient $\beta_1$: p-value < $2.2e-16$ suggests a statistically significant decreasing trend in tuberculosis mortality over time.
+
+Notice that the model's high $R$-squared value indicates that the linear trend explains approximately the $98.3\%$ of the variace in the logarithm data, confirming a strong fit.
+
+Now, we plot the residuals of the serie.
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+residSpain <- residuals(modSpain)
+plot(as.ts(residSpain))
 
 ```
 
-```{r}
+Upon examining the residuals plot of the linear regression model, it becomes evident that the residuals do not follow a normal distribution. This deviation suggests that the model has not fully captured the underlying patterns of the data, and there may still be some autocorrelation or temporal dependencies present in the residuals.
 
-## Iceland detrending
+To further investigate this, we will plot the autocorrelation function (ACF) and partial autocorrelation function (PACF) of the residuals. These plots will help us determine whether there are any significant correlations at specific lags, indicating the presence of autocorrelation that was not accounted for in the linear regression model.
 
-iceland_detrending_data <- total %>% 
-  filter(Country_Name == "Iceland") %>% 
-  arrange(Year) %>% 
-  select(Number_Deaths) 
-  
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
-iceland.ts = ts(iceland_detrending_data, start = c(1951,1), end = c(2022,1), frequency = 1)
-plot(iceland.ts)
-acf(iceland.ts)
-
-iceland_detrended = diff(iceland.ts, differences = 1)
-par(mfrow=c(1,2))
-plot.ts(iceland_detrended)
-acf(iceland_detrended)
+par(mfrow=c(2,2))
+acf(residSpain)
+pacf(residSpain)
 
 ```
+The PACF plot reveals that the first lag is significantly different from zero, indicating that there is a strong correlation between the residual at time $t$ and the residual at time $t−1$. This suggests that the residuals exhibit autocorrelation at this lag, meaning that the error at one time point is related to the error at the previous time point.
 
-```{r}
+We are going to adjust an ARIMA model to the residuals using the `auto.arima` function.
 
-## Netherlands detrending
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+forecast::auto.arima(residSpain)
+```
 
-netherlands_detrending_data <- total %>% 
+We can model the Spain data residuals with an ARIMA of order $(0,1,1)$. So, the regression for Spain time serie is as follows:
+
+$$\ln(Number\_Deaths) = \ln(\beta_0)-\beta_1 \cdot \text{Year} + \ln(u_t),$$
+where $z_t= \ln(u_t)$ follows an ARIMA(0,1,1).
+
+We can do the same for the remaining countries. 
+
+*Netherlands*
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+netherlands_data <- total %>% 
   filter(Country_Name == "Netherlands") %>% 
-  arrange(Year) %>% 
-  select(Number_Deaths)
+  select(Year, Number_Deaths) 
 
-netherlands.ts = ts(netherlands_detrending_data, start = c(1950,1), end = c(2022,1), frequency = 1)
-plot(netherlands.ts)
-acf(netherlands.ts)
-
-netherlands_detrended_1 = diff(netherlands.ts, differences = 1)
-par(mfrow=c(1,2))
-plot.ts(netherlands_detrended_1)
-acf(netherlands_detrended_1)
-
-netherlands_detrended_2 = diff(netherlands.ts, differences = 2)
-par(mfrow=c(1,2))
-plot.ts(netherlands_detrended_2)
-acf(netherlands_detrended_2)
+modNeth <- lm(log(Number_Deaths)~Year, data=netherlands_data)
+summary(modNeth)
 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+residNeth <- residuals(modNeth)
+plot(as.ts(residNeth))
 
-## Switzerland detrending
+```
 
-switzerland_detrending_data <- total %>% 
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+par(mfrow=c(2,2))
+acf(residNeth)
+pacf(residNeth)
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+forecast::auto.arima(residNeth)
+```
+
+*Switzerland*
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+switzerland_data <- total %>% 
   filter(Country_Name == "Switzerland") %>% 
-  arrange(Year) %>% 
-  select(Number_Deaths)
+  select(Year, Number_Deaths) 
 
-switzerland.ts = ts(switzerland_detrending_data, start = c(1951,1), end = c(2021,1), frequency = 1)
-plot(switzerland.ts)
-acf(switzerland.ts)
+modSwitz <- lm(log(Number_Deaths)~Year, data=switzerland_data)
+summary(modSwitz)
 
-switzerland_detrended = diff(switzerland.ts, differences = 1)
-par(mfrow=c(1,2))
-plot.ts(switzerland_detrended)
-acf(switzerland_detrended)
+```
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+residSwitz <- residuals(modSwitz)
+plot(as.ts(residSwitz))
+
+```
+Residus de Switzerland no tenen correlacio
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+par(mfrow=c(2,2))
+acf(residSwitz)
+pacf(residSwitz)
+
+```
+
+
+*Iceland*
+
+PROBLEMA: No podem aplicar log a Iceland perque te valors de ND = 0.
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+iceland_data <- total %>% 
+  filter(Country_Name == "Iceland") %>% 
+  select(Year, Number_Deaths) 
+
+#modIce <- lm(Number_Deaths~Year, data=iceland_data)
+#summary(modIce)
 
 ```
 
@@ -402,21 +439,9 @@ Autocorrelation measures the linear relationship between lagged values of a time
 
 The autocorrelation function tells us the correlation between observations and those that came before them, separated by different lags (forecasting: principles and practice). - When data have a trend, the acutocorrelations for small lags tend to be large and positive, as it is our case.
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
-library(tsibble)
 
-# Spain 
-
-spain_data <- total %>% 
-  filter(Country_Name == "Spain") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year) 
-
-spain_acf <- spain_data %>% 
-  ACF((Number_Deaths), lag_max = 100) %>% 
-  autoplot() +
-  labs(title = "Spain")
 
 # Lithuania
 
@@ -433,17 +458,7 @@ lithuania_acf <- lithuania_data %>%
   autoplot() +
   labs(title = "Lithuania")
 
-#Netherlands
 
-netherlands_data <- total %>% 
-  filter(Country_Name == "Netherlands") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-netherlands_acf <- netherlands_data %>% 
-  ACF(Number_Deaths, lag_max = 100) %>% 
-  autoplot() +
-  labs(title = "Netherlands")
 
 # Iceland
 
@@ -487,12 +502,12 @@ switzerland_acf <- switzerland_data %>%
   autoplot() + 
   labs(title = "Switzerland")
 
-grid.arrange(spain_acf, iceland_acf, lithuania_acf, netherlands_acf, romania_acf, switzerland_acf, ncol = 2, nrow = 3)
+#grid.arrange(spain_acf, iceland_acf, lithuania_acf, netherlands_acf, romania_acf, switzerland_acf, ncol = 2, nrow = 3)
 ```
 
 ## PACF functions
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 library(tsibble)
 
@@ -584,7 +599,7 @@ grid.arrange(spain_pacf, iceland_pacf, lithuania_pacf, netherlands_pacf, romania
 
 If we assume an additive decomposition, then we can write $$y_t = S_t +T_t +R_t,$$ where $y_t$ is the data, $S_t$ is the seasonal component, $T_t$ is the trend-cycle component and $R_t$ is the remainder component, all at period $t$.
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 library(fabletools)
 library(imputeTS)
 library(tsibble)
@@ -666,7 +681,7 @@ ARIMA(p,d,q) model where:
 -   q is the degree of first differencing involved
 -   q is the order of the moving average part
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 library(fable)
 
 fit1 <- spain_data %>% 
@@ -683,7 +698,7 @@ fit1 %>%
 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 fit2 <- iceland_data %>% 
   model(ARIMA(Number_Deaths))
@@ -696,7 +711,7 @@ fit2 %>%
 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 fit3 <- lithuania_data %>% 
   model(ARIMA(Number_Deaths))
@@ -710,7 +725,7 @@ fit3 %>%
 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 fit4 <- netherlands_data %>% 
   model(ARIMA(Number_Deaths))
@@ -724,7 +739,7 @@ fit4 %>%
 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 fit5 <- switzerland_data %>% 
   model(ARIMA(Number_Deaths))
@@ -738,7 +753,7 @@ fit5 %>%
 
 ```
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 fit6 <- romania_data %>% 
   model(ARIMA(Number_Deaths))
