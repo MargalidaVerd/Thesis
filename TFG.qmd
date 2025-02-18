@@ -37,6 +37,9 @@ library(sf)
 library(dplyr)
 library(gridExtra)
 library(tsibble)
+library(tseries)
+library(FinTS)
+library(fable)
 
 
 ```
@@ -297,7 +300,6 @@ grid.arrange(plot_spain, plot_switzerland, plot_iceland, plot_lithuania, plot_ro
 ## Detrending series
 
 
-
 As we saw in the previous section, developed countries exhibit a noticeable downward trend. To apply an ARIMA model, it is essential to work with a stationary time series, meaning data should not have any trend. The goal now is to detrend those series (Spain, Iceland, Netherlands and Switzerland).
 
 $The following regression model was applied:
@@ -402,21 +404,31 @@ modSwitz <- lm(log(Number_Deaths)~Year, data=switzerland_data)
 summary(modSwitz)
 
 ```
+Let's check the residuals:
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 residSwitz <- residuals(modSwitz)
 plot(as.ts(residSwitz))
 
-```
-Residus de Switzerland no tenen correlacio
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-
 par(mfrow=c(2,2))
 acf(residSwitz)
 pacf(residSwitz)
-
 ```
 
+To assure the results, we are going to prove the normality and homoscedasticity using Saphiro test and ARCH test:
+
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+modSwitz %>% forecast::checkresiduals(test = F)
+shapiro.test(residSwitz)
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+residSwitz %>% FinTS::ArchTest()
+```
+
+There is no evidence of ARCH effects, so we can proceed with the study.
 
 *Iceland*
 
@@ -428,10 +440,63 @@ iceland_data <- total %>%
   filter(Country_Name == "Iceland") %>% 
   select(Year, Number_Deaths) 
 
-#modIce <- lm(Number_Deaths~Year, data=iceland_data)
-#summary(modIce)
+modIce <- lm(log(Number_Deaths+10**(-1))~Year, data=iceland_data)
+summary(modIce)
 
 ```
+
+## Stationary series analysis
+
+Once we have detrended the time series, it is time to do the forecast. First, we need to subtract the trend from the original series. We begin, as always, with Spain data.
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+spain_trend <- exp(fitted(modSpain))
+detrended_spain <- spain_data$Number_Deaths /fitted_spain_trend
+detrended_spain_ts = ts(detrended_spain, start = c(1951,1), end = c(2021,1), frequency = 1)
+
+
+ts.plot(detrended_spain_ts)
+
+train_spain = detrended_spain_ts[1:60]
+test_spain = detrended_spain_ts[61:71]
+
+
+arima_spain = forecast::auto.arima(train_spain)
+arima_spain
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+#Modelo 1
+
+spainmodel <- arima(train_spain,order = c(1,1,0))
+spainmodel
+
+```
+Let's check the residuals for the model:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+par(mfrow=c(1,2))
+plot(spainmodel$residuals)
+qqnorm(spainmodel$residuals)
+qqline(spainmodel$residuals,col="red")
+```
+
+Let us examine the predictions for the observations that were not used to adjust the parameters.
+
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+forecast_spain =forecast(spainmodel)
+forecast_spain
+
+
+plot(forecast_spain)
+
+```
+
+
 
 ## Autocorrelation functions
 
