@@ -202,7 +202,7 @@ $ Year         &lt;int&gt; 1960, 1961, 1962, 1963, 1964, 1965, 1966, 1967, 1968,
 $ GDP_capita   &lt;dbl&gt; NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, NA, N…</code></pre>
 </div>
 </div>
-<p>The next step is to select the variables of study of the mortality dataset. We will exclude <code>Sex</code>, <code>Age.group.code</code> and <code>Age.group</code>.</p>
+<p>The next step is to select the study variables from the mortality dataset. We will exclude <code>Sex</code>, <code>Age.group.code</code> and <code>Age.group</code>.</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
 <pre><code>Rows: 4,869
@@ -218,7 +218,7 @@ $ Age_Death_Rate   &lt;dbl&gt; 2.2548644, 0.8057827, 1.1585865, 1.5472763, 0.910
 $ Death_Rate       &lt;dbl&gt; 1.5279087, 0.5715489, 1.0356381, 1.2179888, 0.6896336…</code></pre>
 </div>
 </div>
-<p>Now, we can join the other two datasets:</p>
+<p>Now, we can merge the remaining two datasets.</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
 <pre><code>Rows: 1,998
@@ -460,6 +460,7 @@ Multiple R-squared:  0.9835,    Adjusted R-squared:  0.9833
 F-statistic:  4112 on 1 and 69 DF,  p-value: &lt; 2.2e-16</code></pre>
 </div>
 </div>
+<p>Let’s check the residuals:</p>
 <div class="cell">
 <div class="cell-output-display">
 <div>
@@ -468,8 +469,15 @@ F-statistic:  4112 on 1 and 69 DF,  p-value: &lt; 2.2e-16</code></pre>
 </figure>
 </div>
 </div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-21-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
 </div>
-<p>Residus de Switzerland no tenen correlacio</p>
+</div>
+</div>
+<p>To assure the results, we are going to prove the normality and homoscedasticity using Saphiro test and ARCH test:</p>
 <div class="cell">
 <div class="cell-output-display">
 <div>
@@ -478,48 +486,40 @@ F-statistic:  4112 on 1 and 69 DF,  p-value: &lt; 2.2e-16</code></pre>
 </figure>
 </div>
 </div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residSwitz
+W = 0.95282, p-value = 0.009502</code></pre>
 </div>
-<p><em>Iceland</em></p>
-<p>PROBLEMA: No podem aplicar log a Iceland perque te valors de ND = 0.</p>
+</div>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
 <pre><code>
-Call:
-lm(formula = Number_Deaths ~ Year, data = iceland_data)
+    ARCH LM-test; Null hypothesis: no ARCH effects
 
-Residuals:
-    Min      1Q  Median      3Q     Max 
--5.1330 -2.2551 -0.3631  0.9195 22.6111 
-
-Coefficients:
-             Estimate Std. Error t value Pr(&gt;|t|)    
-(Intercept) 253.40884   43.71728   5.797 1.78e-07 ***
-Year         -0.12559    0.02201  -5.707 2.56e-07 ***
----
-Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-Residual standard error: 3.881 on 70 degrees of freedom
-Multiple R-squared:  0.3175,    Adjusted R-squared:  0.3078 
-F-statistic: 32.57 on 1 and 70 DF,  p-value: 2.557e-07</code></pre>
+data:  .
+Chi-squared = 16.264, df = 12, p-value = 0.1794</code></pre>
 </div>
 </div>
+<p>There is no evidence of ARCH effects, so we can proceed with the study.</p>
+<p><em>Iceland</em></p>
+<p>PROBLEMA: No podem aplicar log a Iceland perque te valors de ND = 0.</p>
+</section>
+<section id="stationary-series-analysis" class="level2">
+<h2 class="anchored" data-anchor-id="stationary-series-analysis">Stationary series analysis</h2>
+<p><em>Spain</em></p>
 <div class="cell">
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-24-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-25-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
-</section>
-<section id="autocorrelation-functions" class="level2">
-<h2 class="anchored" data-anchor-id="autocorrelation-functions">Autocorrelation functions</h2>
-<p>Autocorrelation measures the linear relationship between lagged values of a time series.</p>
-<p>The autocorrelation function tells us the correlation between observations and those that came before them, separated by different lags (forecasting: principles and practice). - When data have a trend, the acutocorrelations for small lags tend to be large and positive, as it is our case.</p>
-</section>
-<section id="pacf-functions" class="level2">
-<h2 class="anchored" data-anchor-id="pacf-functions">PACF functions</h2>
+<p><em>Switzerland</em></p>
 <div class="cell">
 <div class="cell-output-display">
 <div>
@@ -529,157 +529,12 @@ F-statistic: 32.57 on 1 and 70 DF,  p-value: 2.557e-07</code></pre>
 </div>
 </div>
 </div>
-</section>
-<section id="time-series-decomposition" class="level2">
-<h2 class="anchored" data-anchor-id="time-series-decomposition">Time series decomposition</h2>
-<p>If we assume an additive decomposition, then we can write <span class="math display">\[y_t = S_t +T_t +R_t,\]</span> where <span class="math inline">\(y_t\)</span> is the data, <span class="math inline">\(S_t\)</span> is the seasonal component, <span class="math inline">\(T_t\)</span> is the trend-cycle component and <span class="math inline">\(R_t\)</span> is the remainder component, all at period <span class="math inline">\(t\)</span>.</p>
+<p><em>Netherlands</em></p>
 <div class="cell">
 <div class="cell-output-display">
 <div>
 <figure class="figure">
 <p><img src="TFG_files/figure-html/unnamed-chunk-27-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-27-2.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-</section>
-<section id="non-seasonal-arima-models" class="level2">
-<h2 class="anchored" data-anchor-id="non-seasonal-arima-models">Non-seasonal ARIMA models</h2>
-<p>ARIMA(p,d,q) model where:</p>
-<ul>
-<li>p is the order of the AR part</li>
-<li>q is the degree of first differencing involved</li>
-<li>q is the order of the moving average part</li>
-</ul>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>Series: Number_Deaths 
-Model: ARIMA(1,2,0) 
-
-Coefficients:
-         ar1
-      0.8512
-s.e.  0.1289
-
-sigma^2 estimated as 533641:  log likelihood=-553.01
-AIC=1110.03   AICc=1110.21   BIC=1114.49</code></pre>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-28-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>Series: Number_Deaths 
-Model: ARIMA(1,2,0) 
-
-Coefficients:
-         ar1
-      0.8512
-s.e.  0.1289
-
-sigma^2 estimated as 533641:  log likelihood=-553.01
-AIC=1110.03   AICc=1110.21   BIC=1114.49</code></pre>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-29-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>Series: Number_Deaths 
-Model: ARIMA(1,2,0) 
-
-Coefficients:
-         ar1
-      0.8512
-s.e.  0.1289
-
-sigma^2 estimated as 533641:  log likelihood=-553.01
-AIC=1110.03   AICc=1110.21   BIC=1114.49</code></pre>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-30-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>Series: Number_Deaths 
-Model: ARIMA(1,2,0) 
-
-Coefficients:
-         ar1
-      0.8512
-s.e.  0.1289
-
-sigma^2 estimated as 533641:  log likelihood=-553.01
-AIC=1110.03   AICc=1110.21   BIC=1114.49</code></pre>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-31-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>Series: Number_Deaths 
-Model: ARIMA(1,2,0) 
-
-Coefficients:
-         ar1
-      0.8512
-s.e.  0.1289
-
-sigma^2 estimated as 533641:  log likelihood=-553.01
-AIC=1110.03   AICc=1110.21   BIC=1114.49</code></pre>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-32-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>Series: Number_Deaths 
-Model: ARIMA(1,2,0) 
-
-Coefficients:
-         ar1
-      0.8512
-s.e.  0.1289
-
-sigma^2 estimated as 533641:  log likelihood=-553.01
-AIC=1110.03   AICc=1110.21   BIC=1114.49</code></pre>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-33-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>

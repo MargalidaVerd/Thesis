@@ -103,7 +103,7 @@ gdp_per_capita <- gdp_per_capita %>%
   glimpse()
 
 ```
-The next step is to select the variables of study of the mortality dataset. We will exclude `Sex`, `Age.group.code` and `Age.group`.
+The next step is to select the study variables from the mortality dataset. We will exclude `Sex`, `Age.group.code` and `Age.group`.
 
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
@@ -119,7 +119,7 @@ mortality <- mortality %>%
   glimpse()
 ```
 
-Now, we can join the other two datasets:
+Now, we can merge the remaining two datasets.
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 # joins
@@ -436,398 +436,65 @@ PROBLEMA: No podem aplicar log a Iceland perque te valors de ND = 0.
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
-iceland_data <- total %>% 
-  filter(Country_Name == "Iceland") %>% 
-  select(Year, Number_Deaths) 
+#iceland_data <- total %>% 
+  #filter(Country_Name == "Iceland") %>% 
+  #select(Year, Number_Deaths) 
 
-modIce <- lm(log(Number_Deaths+10**(-1))~Year, data=iceland_data)
-summary(modIce)
+#modIce <- lm(log(Number_Deaths)~Year, data=iceland_data)
+#summary(modIce)
 
 ```
 
 ## Stationary series analysis
 
-Once we have detrended the time series, it is time to do the forecast. First, we need to subtract the trend from the original series. We begin, as always, with Spain data.
+*Spain*
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
+spain_data <- as_tsibble(spain_data,index = Year)
 
-spain_trend <- exp(fitted(modSpain))
-detrended_spain <- spain_data$Number_Deaths /fitted_spain_trend
-detrended_spain_ts = ts(detrended_spain, start = c(1951,1), end = c(2021,1), frequency = 1)
+spain_trend <- spain_data %>% 
+  model(exponential = TSLM(log(Number_Deaths)~ trend()))
 
+spain_trends <- spain_trend |> forecast(h = 15)
 
-ts.plot(detrended_spain_ts)
-
-train_spain = detrended_spain_ts[1:60]
-test_spain = detrended_spain_ts[61:71]
-
-
-arima_spain = forecast::auto.arima(train_spain)
-arima_spain
-
+spain_data |>
+  autoplot(Number_Deaths) +
+  geom_line(data = fitted(spain_trend),
+            aes(y = .fitted, colour = .model)) +
+  autolayer(spain_trends, alpha = 0.5, level = 95)
 ```
+
+*Switzerland*
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
+switzerland_data <- as_tsibble(switzerland_data,index = Year)
 
-#Modelo 1
+switzerland_trend <- switzerland_data %>% 
+  model(exponential = TSLM(log(Number_Deaths)~ trend()))
 
-spainmodel <- arima(train_spain,order = c(1,1,0))
-spainmodel
+switzerland_trends <- switzerland_trend |> forecast(h = 15)
 
+switzerland_data |>
+  autoplot(Number_Deaths) +
+  geom_line(data = fitted(switzerland_trend),
+            aes(y = .fitted, colour = .model)) +
+  autolayer(switzerland_trends, alpha = 0.5, level = 95)
 ```
-Let's check the residuals for the model:
+
+*Netherlands*
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
-par(mfrow=c(1,2))
-plot(spainmodel$residuals)
-qqnorm(spainmodel$residuals)
-qqline(spainmodel$residuals,col="red")
+netherlands_data <- as_tsibble(netherlands_data,index = Year)
+
+netherlands_trend <- netherlands_data %>% 
+  model(exponential = TSLM(log(Number_Deaths)~ trend()))
+
+netherlands_trends <- netherlands_trend |> forecast(h = 15)
+
+netherlands_data |>
+  autoplot(Number_Deaths) +
+  geom_line(data = fitted(netherlands_trend),
+            aes(y = .fitted, colour = .model)) +
+  autolayer(netherlands_trends, alpha = 0.5, level = 95)
 ```
 
-Let us examine the predictions for the observations that were not used to adjust the parameters.
-
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-forecast_spain =forecast(spainmodel)
-forecast_spain
-
-
-plot(forecast_spain)
-
-```
-
-
-
-## Autocorrelation functions
-
-Autocorrelation measures the linear relationship between lagged values of a time series.
-
-The autocorrelation function tells us the correlation between observations and those that came before them, separated by different lags (forecasting: principles and practice). - When data have a trend, the acutocorrelations for small lags tend to be large and positive, as it is our case.
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-
-
-
-# Lithuania
-
-lithuania_data <- total %>% 
-  filter(Country_Name == "Lithuania") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-lithuania_data <- lithuania_data %>% 
-  fill_gaps()
-
-lithuania_acf <- lithuania_data %>% 
-  ACF(Number_Deaths, lag_max = 100) %>% 
-  autoplot() +
-  labs(title = "Lithuania")
-
-
-
-# Iceland
-
-iceland_data <- total %>% 
-  filter(Country_Name == "Iceland") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-iceland_acf <- iceland_data %>% 
-  ACF(Number_Deaths, lag_max = 100) %>% 
-  autoplot() +
-  labs(title = "Iceland")
-
-
-# Romania
-
-romania_data <- total %>% 
-  filter(Country_Name == "Romania") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-romania_data <- romania_data %>% 
-  fill_gaps()
-
-romania_acf<- romania_data %>% 
-  ACF(Number_Deaths, lag_max = 100) %>% 
-  autoplot() +
-  labs(title = "Romania")
-
-
-# Switzerland
-
-
-switzerland_data <- total %>% 
-  filter(Country_Name == "Switzerland") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-switzerland_acf <- switzerland_data %>% 
-  ACF(Number_Deaths, lag_max = 100) %>% 
-  autoplot() + 
-  labs(title = "Switzerland")
-
-#grid.arrange(spain_acf, iceland_acf, lithuania_acf, netherlands_acf, romania_acf, switzerland_acf, ncol = 2, nrow = 3)
-```
-
-## PACF functions
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-
-library(tsibble)
-
-# Spain 
-
-spain_data <- total %>% 
-  filter(Country_Name == "Spain") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year) 
-
-spain_pacf <- spain_data %>% 
-  PACF((Number_Deaths), lag_max = 100) %>% 
-  autoplot() +
-  labs(title = "Spain")
-
-# Lithuania
-
-lithuania_data <- total %>% 
-  filter(Country_Name == "Lithuania") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-lithuania_data <- lithuania_data %>% 
-  fill_gaps()
-
-lithuania_pacf <- lithuania_data %>% 
-  PACF(Number_Deaths, lag_max = 100) %>% 
-  autoplot() +
-  labs(title = "Lithuania")
-
-#Netherlands
-
-netherlands_data <- total %>% 
-  filter(Country_Name == "Netherlands") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-netherlands_pacf <- netherlands_data %>% 
-  PACF(Number_Deaths, lag_max = 100) %>% 
-  autoplot() +
-  labs(title = "Netherlands")
-
-# Iceland
-
-iceland_data <- total %>% 
-  filter(Country_Name == "Iceland") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-iceland_pacf <- iceland_data %>% 
-  ACF(Number_Deaths, lag_max = 100) %>% 
-  autoplot() +
-  labs(title = "Iceland")
-
-
-# Romania
-
-romania_data <- total %>% 
-  filter(Country_Name == "Romania") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-romania_data <- romania_data %>% 
-  fill_gaps()
-
-romania_pacf<- romania_data %>% 
-  PACF(Number_Deaths, lag_max = 100) %>% 
-  autoplot() +
-  labs(title = "Romania")
-
-
-# Switzerland
-
-
-switzerland_data <- total %>% 
-  filter(Country_Name == "Switzerland") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-switzerland_pacf <- switzerland_data %>% 
-  PACF(Number_Deaths, lag_max = 100) %>% 
-  autoplot() + 
-  labs(title = "Switzerland")
-
-grid.arrange(spain_pacf, iceland_pacf, lithuania_pacf, netherlands_pacf, romania_pacf, switzerland_pacf, ncol = 2, nrow = 3)
-```
-
-## Time series decomposition
-
-If we assume an additive decomposition, then we can write $$y_t = S_t +T_t +R_t,$$ where $y_t$ is the data, $S_t$ is the seasonal component, $T_t$ is the trend-cycle component and $R_t$ is the remainder component, all at period $t$.
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-library(fabletools)
-library(imputeTS)
-library(tsibble)
-
-spain_dcmp <- spain_data %>% 
-  model(stl= STL(Number_Deaths))
-
-b1 <- components(spain_dcmp) %>% 
-  autoplot() +
-  labs(title = "Spain")
-
-
-iceland_dcmp <- iceland_data %>% 
-  model(stl= STL(Number_Deaths))
-
-b2 <- components(iceland_dcmp) %>% 
-  autoplot() +
-  labs(title = "Iceland")
-
-netherlands_dcmp <- netherlands_data %>% 
-  model(stl= STL(Number_Deaths))
-
-b3 <- components(netherlands_dcmp)%>% 
-  autoplot() +
-  labs(title = "Netherlands")
-
-lithuania_prove <- total %>% 
-  filter(Country_Name == "Lithuania") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-lithuania_prove <- lithuania_prove %>%
-  fill_gaps() %>%
-  mutate(Number_Deaths = imputeTS::na_interpolation(Number_Deaths))
-
-lithuania_dcmp <- lithuania_prove %>% 
-  model(stl= STL(Number_Deaths))
-
-b4 <- components(lithuania_dcmp) %>% 
-  autoplot() +
-  labs(title = "Lithuania")
-
-romania_prove <- total %>% 
-  filter(Country_Name == "Romania") %>% 
-  select(Year, Number_Deaths) %>% 
-  as_tsibble(index = Year)
-
-romania_prove <- romania_prove %>%
-  fill_gaps() %>%
-  mutate(Number_Deaths = imputeTS::na_interpolation(Number_Deaths))
-
-romania_dcmp <- romania_prove %>% 
-  model(stl= STL(Number_Deaths))
-
-
-b5 <- components(romania_dcmp) %>% 
-  autoplot() +
-  labs(title = "Romania")
-
-
-switzerland_dcmp <- switzerland_data %>% 
-  model(stl= STL(Number_Deaths))
-
-b6 <- components(switzerland_dcmp) %>% 
-  autoplot() +
-  labs(title = "Switzerland")
-
-grid.arrange(b1,b2,b3,b4,b5,b6, nrow = 2)
-
-b6
-
-```
-
-## Non-seasonal ARIMA models
-
-ARIMA(p,d,q) model where:
-
--   p is the order of the AR part
--   q is the degree of first differencing involved
--   q is the order of the moving average part
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-library(fable)
-
-fit1 <- spain_data %>% 
-  model(ARIMA(Number_Deaths))
-
-
-report(fit1)
-
-fit1 %>% 
-  forecast(h=10) %>% 
-  autoplot(spain_data)
-
-
-
-```
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-
-fit2 <- iceland_data %>% 
-  model(ARIMA(Number_Deaths))
-
-report(fit1)
-
-fit2 %>% 
-  forecast(h=10) %>% 
-  autoplot(iceland_data)
-
-```
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-
-fit3 <- lithuania_data %>% 
-  model(ARIMA(Number_Deaths))
-
-report(fit1)
-
-fit3 %>% 
-  forecast(h=10) %>% 
-  autoplot(lithuania_data)
-
-
-```
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-
-fit4 <- netherlands_data %>% 
-  model(ARIMA(Number_Deaths))
-
-report(fit1)
-
-fit4 %>% 
-  forecast(h=10) %>% 
-  autoplot(netherlands_data)
-
-
-```
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-
-fit5 <- switzerland_data %>% 
-  model(ARIMA(Number_Deaths))
-
-report(fit1)
-
-fit5 %>% 
-  forecast(h=10) %>% 
-  autoplot(switzerland_data)
-
-
-```
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-
-fit6 <- romania_data %>% 
-  model(ARIMA(Number_Deaths))
-
-report(fit1)
-
-fit6 %>% 
-  forecast(h=10) %>% 
-  autoplot(romania_data)
-
-
-```
