@@ -7,13 +7,13 @@ editor: visual
 
 ## Installing data and packages
 
-First, we will install and load the necessary packages for this study. Additionally, we will load the required datasets. The analysis is based on three datasets:  
+First, we will install and load the necessary packages for this study. Additionally, we will load the required datasets. The analysis is based on three datasets:
 
-- **Mortality**: Downloaded from the World Health Organization, this is the primary dataset for the analysis. It contains the number of tuberculosis-related deaths in all countries. However, our study will focus solely on European countries.  
+-   **Mortality**: Downloaded from the World Health Organization, this is the primary dataset for the analysis. It contains the number of tuberculosis-related deaths in all countries. However, our study will focus solely on European countries.
 
-- **Population**: From this dataset, we will extract only the population variable. The source of this data is *Our World in Data*.  
+-   **Population**: From this dataset, we will extract only the population variable. The source of this data is *Our World in Data*.
 
-- **GDP per capita**: Similar to the population dataset, we will extract only the *gdp_per_capita* variable. The source of this data is *Data Bank*.  
+-   **GDP per capita**: Similar to the population dataset, we will extract only the *gdp_per_capita* variable. The source of this data is *Data Bank*.
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
@@ -36,85 +36,91 @@ library(ggplot2)
 library(sf)
 library(dplyr)
 library(gridExtra)
+library(grid)
 library(tsibble)
 library(tseries)
 library(FinTS)
 library(fable)
+library(vctsfr)
 
 
 ```
 
 Let's examine the structure of the datasets:
 
-1. Mortality: 
+1.  Mortality:
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 # data loading
 
-mortality <- read.csv("mortality.csv", header = TRUE, colClasses = c("character","character","character","character","double","character","character","character","double","double","double","double"), row.names = NULL) 
+mortality_dataset <- read.csv("mortality.csv", header = TRUE, colClasses = c("character","character","character","character","double","character","character","character","double","double","double","double"), row.names = NULL) 
 
-colnames(mortality) <- colnames(mortality)[2:ncol(mortality)]
-mortality <- mortality[1:(ncol(mortality)-1)]
+colnames(mortality_dataset) <- colnames(mortality_dataset)[2:ncol(mortality_dataset)]
+mortality_dataset <- mortality_dataset[1:(ncol(mortality_dataset)-1)]
 
-mortality %>% 
+mortality_dataset %>% 
   glimpse()
-```
-2. Population
 
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-population <- read.csv("population.csv", header = TRUE)
-
-population %>% 
-  glimpse()
+unique(mortality_dataset$Age.group)
 ```
 
-3. gdp_per_capita
+2.  Population
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
-gdp_per_capita <- read.csv("gdp_per_capita.csv", header = TRUE)
+population_dataset <- read.csv("population.csv", header = TRUE)
 
-gdp_per_capita %>% 
+population_dataset %>% 
+  glimpse()
+```
+
+3.  gdp_per_capita
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+gdp_per_capita_dataset <- read.csv("gdp_per_capita.csv", header = TRUE)
+
+gdp_per_capita_dataset %>% 
   glimpse()
 ```
 
 ## Cleaning data
 
-As seen, we need to standardize the variables names to merge the tables. 
+As seen, we need to standardize the variables names to merge the tables.
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 # renaming variables
 
 print("Mortality")
 
-mortality <- mortality %>%  
-  rename(Number_Deaths = Number, Percent_CS_Death = Percentage.of.cause.specific.deaths.out.of.total.deaths, Age_Death_Rate = Age.standardized.death.rate.per.100.000.standard.population, Death_Rate = Death.rate.per.100.000.population, Country_Name = Country.Name,Country_Code = Country.Code, Region_Code = Region.Code, Region_Name = Region.Name) %>% 
+mortality_dataset <- mortality_dataset %>%  
+  rename(number_deaths = Number, 
+         year = Year, percent_cause_specific_death_rate = Percentage.of.cause.specific.deaths.out.of.total.deaths, age_death_rate = Age.standardized.death.rate.per.100.000.standard.population, death_rate = Death.rate.per.100.000.population, country_name = Country.Name, country_code = Country.Code, region_code = Region.Code, region_name = Region.Name) %>% 
   glimpse() 
 
 print("Population")
-population <- population %>% 
-  rename(Population = Population...Sex..all...Age..all...Variant..estimates, Country_Name = Entity) %>% 
+population_dataset <- population_dataset %>% 
+  rename(population = Population...Sex..all...Age..all...Variant..estimates, country_name = Entity, year = Year) %>% 
   glimpse() 
 
 print("gdp_per_capita")
-gdp_per_capita <- gdp_per_capita %>% 
+gdp_per_capita_dataset <- gdp_per_capita_dataset %>% 
   select(3,4,5,7) %>% 
-  rename(Country_Name = Country.Name, Country_Code = Country.Code, Year = Time, GDP_capita = Value) %>% 
+  rename(country_name = Country.Name, country_code = Country.Code, year = Time, gdp_capita = Value) %>% 
   glimpse()
 
 ```
-The next step is to select the study variables from the mortality dataset. We will exclude `Sex`, `Age.group.code` and `Age.group`.
 
+The next step is to select the study variables from the mortality dataset. We will exclude `Sex`, `Age.group.code` and `Age.group`.
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 # Select rows of interest in the mortality dataset
 
-mortality <- mortality %>% 
+mortality_dataset <- mortality_dataset %>% 
   dplyr::filter(Sex == "All") 
 
 # Delete age variables
 
-mortality <- mortality %>% 
+mortality_dataset <- mortality_dataset %>% 
   select(1:5,9:12) %>% 
   glimpse()
 ```
@@ -124,14 +130,14 @@ Now, we can merge the remaining two datasets.
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 # joins
 
-total <- mortality %>% 
-  left_join(population, by=c("Country_Name", "Year")) %>% 
-  left_join(gdp_per_capita, by = c("Country_Code", "Year")) %>% 
-  dplyr::filter(Region_Code=="EU") %>% 
+complete_data <- mortality_dataset %>% 
+  left_join(population_dataset, by=c("country_name", "year")) %>% 
+  left_join(gdp_per_capita_dataset, by = c("country_code", "year")) %>% 
+  dplyr::filter(region_code=="EU") %>% 
   select(1:10,12) %>% 
-  rename(Country_Name = Country_Name.x) 
+  rename(country_name = country_name.x) 
 
-total %>% 
+complete_data %>% 
   glimpse()
 
 ```
@@ -142,27 +148,29 @@ First, we will define the criteria for dividing European countries into six dist
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
-total <- total %>%
-  mutate(Subregion = case_when(
-    Country_Name %in% c("Iceland", "Norway", "Sweden", "Finland", "Denmark") ~ "N",
-    Country_Name %in% c("Spain", "Portugal", "Italy", "Malta", "Greece") ~ "S",
-    Country_Name %in% c("Albania", "Bulgaria", "Romania", "Bosnia and Herzegovina", 
+complete_data <- complete_data %>%
+  mutate(subregion = case_when(
+    country_name %in% c("Iceland", "Norway", "Sweden", "Finland", "Denmark") ~ "N",
+    country_name %in% c("Spain", "Portugal", "Italy", "Malta", "Greece") ~ "S",
+    country_name %in% c("Albania", "Bulgaria", "Romania", "Bosnia and Herzegovina", 
                 "North Macedonia", "Croatia", "Serbia", "Montenegro", "Slovenia") ~ "B",
-    Country_Name %in% c("France", "Netherlands", "Belgium", "United Kingdom", "Ireland") ~ "W",
-    Country_Name %in% c("Russia", "Estonia", "Latvia", "Lithuania", "Belarus", "Ukraine", "Moldova") ~"E",
-    Country_Name %in% c("Germany", "Poland", "Czechia", "Slovakia", "Hungary", 
-                "Switzerland", "Austria", "Luxembourg") ~ "C" ,TRUE ~ NA_character_), .after = Region_Name)
+    country_name %in% c("France", "Netherlands", "Belgium", "United Kingdom", "Ireland") ~ "W",
+    country_name %in% c("Russia", "Estonia", "Latvia", "Lithuania", "Belarus", "Ukraine", "Moldova") ~"E",
+    country_name %in% c("Germany", "Poland", "Czechia", "Slovakia", "Hungary", 
+                "Switzerland", "Austria", "Luxembourg") ~ "C" ,TRUE ~ NA_character_), .after = region_name)
 
 ```
 
 The map below shows the division that would be used from this point forward.
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
 # Load world map with country boundaries
 world <- ne_countries(scale = "medium", returnclass = "sf")
 
 # Filter only European countries
-europe <- world %>% filter(continent == "Europe")
+europe <- world %>% 
+  filter(continent == "Europe")
 
 
 # Define the classification
@@ -183,16 +191,16 @@ europe <- europe %>%
 ggplot(data = europe) +
   geom_sf(aes(fill = Subregion), color = "black") +
   scale_fill_manual(values = c(
-    "N" = "#377EB8",    
-    "S" = "#E41A1C",    
-    "W" = "#4DAF4A",    
-    "E" = "#FF7F00",   
-    "C" = "#984EA3",    
-    "B" = "#FFFF33"    
+    "N" = "#F5BA6A",    
+    "S" = "#4044A8",    
+    "W" = "#CC4853",    
+    "E" = "#5ED171",   
+    "C" = "#F5E973",    
+    "B" = "#66B0FA"    
   )) + scale_x_continuous(limits = c(-20, 35)) +
   scale_y_continuous(limits = c(35, 70)) +
   theme_minimal() +
-  labs(title = "Europe classification by subregion",
+  labs(
        fill = "Subregion") +
   theme(legend.position = "right")
 ```
@@ -203,10 +211,10 @@ As a first step, we will address any missing values (NA) in the dataset for the 
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
-total %>% 
-  dplyr::select(Country_Name, Number_Deaths) %>% 
+complete_data %>% 
+  dplyr::select(country_name, number_deaths) %>% 
   na.exclude() %>%  
-  group_by(Country_Name) %>% 
+  group_by(country_name) %>% 
   count() %>% 
   arrange(desc(n)) %>% 
   data.frame() %>% 
@@ -232,269 +240,410 @@ The selection criteria prioritize minimizing the number of missing values (NA) w
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
-
-chosen_countries <- total %>% 
-  select(Country_Name, Year, Number_Deaths) 
+chosen_countries <- complete_data %>% 
+  select(country_name, year, number_deaths) 
 
 chosen_countries %>% 
-  filter(Country_Name %in% c( "Lithuania", "Iceland", "Netherlands", "Spain", "Romania", "Switzerland")) %>%  
-  ggplot(aes(x = Year, y = Number_Deaths, color = Country_Name)) +  
+  filter(country_name %in% c( "Spain", "Sweden", "Netherlands", "Switzerland", "Latvia", "Romania")) %>%  
+  ggplot(aes(x = year, y = number_deaths, color = country_name)) +  
   geom_line() +
   coord_cartesian(ylim = c(0,2700)) +
   scale_color_manual(values = c(
-    "Spain" = "#E41A1C",
-    "Iceland" = "#377EB8",   
-    "Netherlands" = "#4DAF4A",    
-    "Lithuania" = "#FF7F00",   
-    "Switzerland" = "#984EA3",   
-    "Romania" = "#FFFF33"
+    "Romania" = "#04A3BDFF",    
+    "Switzerland" = "#F0BE3DFF",    
+    "Latvia" = "#931E18FF",    
+    "Sweden" = "#DA7901FF",   
+    "Spain" = "#247D3FFF",    
+    "Netherlands" = "#20235BFF"    
   )) + 
   theme_minimal() +
-  labs(title = "Chosen countries tuberculosis-related deaths trends") +
-  theme(legend.position = "right")
-
-
-plot_spain <- chosen_countries %>% 
-  filter(Country_Name == "Spain") %>%  
-  ggplot(aes(x = Year, y = Number_Deaths)) +  
-  geom_line() +
-  labs(title = "Spain") 
-
-plot_iceland <- chosen_countries %>% 
-  filter(Country_Name == "Iceland") %>%  
-  ggplot(aes(x = Year, y = Number_Deaths)) +  
-  geom_line() +
-  labs(title = "Iceland") 
-
-plot_netherlands <- chosen_countries %>% 
-  filter(Country_Name == "Netherlands") %>%  
-  ggplot(aes(x = Year, y = Number_Deaths)) +  
-  geom_line() +
-  labs(title = "Netherlands") 
-
-plot_romania <- chosen_countries %>% 
-  filter(Country_Name == "Romania") %>%  
-  ggplot(aes(x = Year, y = Number_Deaths)) +  
-  geom_line() +
-  labs(title = "Romania") 
-
-plot_lithuania <- chosen_countries %>% 
-  filter(Country_Name == "Lithuania") %>%  
-  ggplot(aes(x = Year, y = Number_Deaths)) +  
-  geom_line() +
-  labs(title = "Lithuania") 
-
-
-plot_switzerland <- chosen_countries %>% 
-  filter(Country_Name == "Switzerland") %>%  
-  ggplot(aes(x = Year, y = Number_Deaths)) +  
-  geom_line() +
-  labs(title = "Switzerland") 
-
-
-grid.arrange(plot_spain, plot_switzerland, plot_iceland, plot_lithuania, plot_romania, plot_netherlands, nrow = 3)
+  ggtitle("Chosen countries trends")+
+  theme(legend.position = "right") +
+  ylab("Number of deaths")
 
 ```
 
+```{r}
+
+plot_spain <- chosen_countries %>% 
+  filter(country_name == "Spain") %>%  
+  ggplot(aes(x = year, y = number_deaths)) +  
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Spain" ) +
+  theme(plot.title = element_text(hjust= 0.5, size = 10),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+
+
+plot_sweden <- chosen_countries %>% 
+  filter(country_name == "Sweden") %>%  
+  ggplot(aes(x = year, y = number_deaths)) +  
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Sweden", y = "Number of deaths") +
+  theme(plot.title = element_text(hjust= 0.5, size = 10),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+
+plot_netherlands <- chosen_countries %>% 
+  filter(country_name == "Netherlands") %>%  
+  ggplot(aes(x = year, y = number_deaths)) +  
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Netherlands", y = "Number of deaths") +
+  theme(plot.title = element_text(hjust= 0.5, size = 10),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+
+plot_romania <- chosen_countries %>% 
+  filter(country_name == "Romania") %>%  
+  ggplot(aes(x = year, y = number_deaths)) +  
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Romania", y = "Number of deaths") +
+  theme(plot.title = element_text(hjust= 0.5, size = 10),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+
+plot_latvia <- chosen_countries %>% 
+  filter(country_name == "Latvia") %>%  
+  ggplot(aes(x = year, y = number_deaths)) +  
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Latvia", y = "Number of deaths") +
+  theme(plot.title = element_text(hjust= 0.5, size = 10),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+
+
+plot_switzerland <- chosen_countries %>% 
+  filter(country_name == "Switzerland") %>%  
+  ggplot(aes(x = year, y = number_deaths)) +  
+  geom_line() +
+  theme_minimal() +
+  labs(title = "Switzerland", y = "Number of deaths") +
+  theme(plot.title = element_text(hjust= 0.5, size = 10),
+        axis.title.x = element_blank(),
+        axis.title.y = element_blank())
+
+plot_spain
+plot_switzerland
+plot_sweden
+plot_latvia
+plot_romania
+plot_netherlands
+
+grid.arrange(
+  plot_spain, 
+  plot_switzerland, 
+  plot_sweden, 
+  plot_latvia, 
+  plot_romania, 
+  plot_netherlands, 
+  nrow = 3,
+  top = "TB mortality trends per country",
+  bottom = textGrob(
+    "Year",
+    gp = gpar( fontsize = 10),
+    hjust = 0),
+  left = textGrob(
+    "Number of deaths",
+    gp = gpar(fontsize = 10),
+    rot = 90,
+    hjust = 0.5  )
+)
+
+```
 
 ## Detrending series
 
+In order to build accurate time series models, the data must be stationary—meaning it should exhibit constant mean and variance over time. Since developed countries (e.g., Spain, the Netherlands) show a strong downward trend in TB death counts over the years, we begin by transforming the original data using logarithms. This transformation stabilizes the variance and linearizes exponential trends, making the data more suitable for ARIMA modeling.
 
-As we saw in the previous section, developed countries exhibit a noticeable downward trend. To apply an ARIMA model, it is essential to work with a stationary time series, meaning data should not have any trend. The goal now is to detrend those series (Spain, Iceland, Netherlands and Switzerland).
+### Spain
 
-$The following regression model was applied:
-
-$$\ln(Number\_Deaths)= \ln(\beta_0)-\beta_1 \cdot \text{Year} + \ln(u_t),$$
-where $u_t$ represents the residuals term. We will use the function `lm` for the regression. We begin our study with Spain data. The estimated coefficients are as follows:
+We start with the Spanish data:
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 # Spain 
 
-spain_data <- total %>% 
-  filter(Country_Name == "Spain") %>% 
-  select(Year, Number_Deaths)
+spain_data <- chosen_countries %>% 
+  filter(country_name == "Spain") %>% 
+  select(year, number_deaths) %>% 
+  arrange(year)
 
+vctsfr::plot_ts(ts(spain_data$number_deaths, start = c(1951), frequency = 1))
 
-modSpain <- lm(log(Number_Deaths)~Year, data=spain_data)
-summary(modSpain)
+log_spain_data <- ts(log(spain_data$number_deaths), start = c(1951), frequency = 1)
+
+vctsfr::plot_ts(log_spain_data)
+```
+
+Let's check the ACF and PACF of the series:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+par(mfrow = c(2,2))
+acf(log_spain_data)
+pacf(log_spain_data)
+```
+
+Upon inspecting the ACF and PACF plots, we observe a strong autocorrelation in the undifferenced series, particularly at lower lags. To remove this non-stationarity, we apply first-order differencing:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+log_spain_data_diff <- log_spain_data %>% 
+  diff(differences = 1) 
+```
+
+The resulting ACF and PACF plots indicate that autocorrelations have been adequately removed, and the series is now stationary:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+par(mfrow = c(2,2))
+acf(log_spain_data_diff)
+pacf(log_spain_data_diff)
+```
+
+We fit an ARIMA model automatically selected by auto.arima() from the forecast package, which chooses the best-fitting model based on information criteria (AICc by default):
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+fit_spain <- forecast::auto.arima(log_spain_data)
+fit_spain
+fit_spain %>% forecast::checkresiduals()
 
 ```
-- Intercept: p-value < $2.2e-16$ indicates it is a significant baseline value.
-- Year coefficient $\beta_1$: p-value < $2.2e-16$ suggests a statistically significant decreasing trend in tuberculosis mortality over time.
+To properly check the normality of the residuals, we do the Shapiro-Wilk test:
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+shapiro.test(residuals(fit_spain))
+```
 
-Notice that the model's high $R$-squared value indicates that the linear trend explains approximately the $98.3\%$ of the variace in the logarithm data, confirming a strong fit.
+The ARIMA model applied is the ARIMA(0,1,0), as it is the best suited fot the series. Residual diagnostics support this model. The Ljung-Box test yields a p-value of 0.9954, suggesting no significant autocorrelation in the residuals. However, the Shapiro-Wilk test for normality gave a p-value of 5.88×10⁻⁵, leading us to reject the null hypothesis of normality. This implies that while the model captures the time dependence effectively, the residuals deviate from normality. To account for this, bootstrapping was enabled during forecasting to generate more robust prediction intervals.
 
-Now, we plot the residuals of the serie.
+Setting bootstrap = TRUE enables the computation of prediction intervals using bootstrapped innovations rather than assuming normality. This is particularly useful when residuals show slight deviations from normality or the model is very sensitive to error structure. Bootstrapping provides more robust and possibly asymmetric confidence intervals. However, it also increases computational time.
+
+Now, to forecast future values, we apply the `forecast()`function:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+forecasted_spain <- forecast(fit_spain,level = c(95), h=3, bootstrap = TRUE)
+autoplot(forecasted_spain)
+```
+
+Next, we back-transform the forecasts to the original scale by applying the exponential function:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+exp_forecasted_spain_fitted <- exp(forecasted_spain$fitted)
+data <- spain_data %>% 
+  mutate(exp_fitted = exp_forecasted_spain_fitted) 
+data
+```
+The fitted values and forecasts are then plotted alongside the original series to assess model performance:
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+ggplot(data, aes(x = year)) +
+  geom_line(aes(y = number_deaths, color = "Actual")) +
+  geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
+  labs(title = "Actual vs Fitted TB Deaths in Spain",
+       x = "Year", y = "Number of Deaths",
+       color = "Legend") +
+  ylim(0,1000) +
+  xlim(1980,2021) +
+  theme_minimal()
+```
+
+To display the forecasts an their associated uncerainty, we prepare a data frame with the exponential of the forecast and confidence intervals:
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
-residSpain <- residuals(modSpain)
-plot(as.ts(residSpain))
+df_forecast_spain <- data.frame(
+  year = time(forecasted_spain$mean),
+  mean = exp(forecasted_spain$mean),
+  lower = exp(forecasted_spain$lower[,1]),
+  upper = exp(forecasted_spain$upper[,1])
+)
+
+df_forecast_spain
 
 ```
-
-Upon examining the residuals plot of the linear regression model, it becomes evident that the residuals do not follow a normal distribution. This deviation suggests that the model has not fully captured the underlying patterns of the data, and there may still be some autocorrelation or temporal dependencies present in the residuals.
-
-To further investigate this, we will plot the autocorrelation function (ACF) and partial autocorrelation function (PACF) of the residuals. These plots will help us determine whether there are any significant correlations at specific lags, indicating the presence of autocorrelation that was not accounted for in the linear regression model.
+Finally, we visualize the forecasts:
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
-par(mfrow=c(2,2))
-acf(residSpain)
-pacf(residSpain)
+ggplot() +
+  geom_line(data = spain_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_spain, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_spain, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "blue") +
+  scale_color_manual(values = c("Actual" = "black", "Forecast" = "blue")) +
+  labs(title = "TB Death forecast for Spain data",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  coord_cartesian(xlim = c(2012, 2024), ylim = c(0,1000)) +
+  theme_minimal()
 
-```
-The PACF plot reveals that the first lag is significantly different from zero, indicating that there is a strong correlation between the residual at time $t$ and the residual at time $t−1$. This suggests that the residuals exhibit autocorrelation at this lag, meaning that the error at one time point is related to the error at the previous time point.
-
-We are going to adjust an ARIMA model to the residuals using the `auto.arima` function.
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-forecast::auto.arima(residSpain)
-```
-
-We can model the Spain data residuals with an ARIMA of order $(0,1,1)$. So, the regression for Spain time serie is as follows:
-
-$$\ln(Number\_Deaths) = \ln(\beta_0)-\beta_1 \cdot \text{Year} + \ln(u_t),$$
-where $z_t= \ln(u_t)$ follows an ARIMA(0,1,1).
-
-We can do the same for the remaining countries. 
-
-*Netherlands*
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-
-netherlands_data <- total %>% 
-  filter(Country_Name == "Netherlands") %>% 
-  select(Year, Number_Deaths) 
-
-modNeth <- lm(log(Number_Deaths)~Year, data=netherlands_data)
-summary(modNeth)
 
 ```
 
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-residNeth <- residuals(modNeth)
-plot(as.ts(residNeth))
+The ARIMA(0,1,0) model applied to the log-transformed TB death series for Spain captures the downward trend effectively, with residual diagnostics confirming no significant autocorrelation. However, the residuals deviate from normality, which was addressed using bootstrapped forecasts to provide more reliable prediction intervals. The fitted values closely track the actual data, and the short-term forecasts show a continued decline in TB deaths, with relatively narrow confidence intervals, reflecting stability in the trend. These results suggest that ARIMA(0,1,0) is a simple yet adequate model for capturing and forecasting TB mortality trends in Spain.
 
-```
+### Netherlands
 
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
+We now apply the same methodology to the Netherlands, a country that also shows a notable long-term decrease in TB deaths.
 
-par(mfrow=c(2,2))
-acf(residNeth)
-pacf(residNeth)
+```{r}
+netherlands_data <- chosen_countries %>% 
+  filter(country_name == "Netherlands") %>% 
+  select(year, number_deaths) %>% 
+  arrange(year)
+netherlands_data
 
-```
+vctsfr::plot_ts(ts(netherlands_data$number_deaths, start = c(1950), frequency = 1))
 
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
+log_netherlands_data <- ts(log(netherlands_data$number_deaths), start = c(1950), frequency = 1)
 
-forecast::auto.arima(residNeth)
-```
-
-*Switzerland*
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-
-switzerland_data <- total %>% 
-  filter(Country_Name == "Switzerland") %>% 
-  select(Year, Number_Deaths) 
-
-modSwitz <- lm(log(Number_Deaths)~Year, data=switzerland_data)
-summary(modSwitz)
-
-```
-Let's check the residuals:
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-residSwitz <- residuals(modSwitz)
-plot(as.ts(residSwitz))
-
-par(mfrow=c(2,2))
-acf(residSwitz)
-pacf(residSwitz)
-```
-
-To assure the results, we are going to prove the normality and homoscedasticity using Saphiro test and ARCH test:
-
-
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-modSwitz %>% forecast::checkresiduals(test = F)
-shapiro.test(residSwitz)
+vctsfr::plot_ts(log_spain_data)
 ```
 
 
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-residSwitz %>% FinTS::ArchTest()
+```{r}
+par(mfrow = c(2,2))
+acf(log_netherlands_data)
+pacf(log_netherlands_data)
+```
+We difference the series once:
+
+```{r}
+log_netherlands_data_diff <- log_netherlands_data %>% 
+  diff(differences = 1) 
 ```
 
-There is no evidence of ARCH effects, so we can proceed with the study.
+Now, let's check again the ACF and PACF:
 
-*Iceland*
+```{r}
+par(mfrow = c(2,2))
+acf(log_netherlands_data_diff)
+pacf(log_netherlands_data_diff)
+```
+The ACF slowly shows a possible significant lag at $t-1$. We will present two different models: ARIMA(0,1,0) and ARIMA(0,1,1).
 
-PROBLEMA: No podem aplicar log a Iceland perque te valors de ND = 0.
+```{r}
+fit_netherlands_model_1 <- forecast::auto.arima(log_netherlands_data)
+fit_netherlands_model_1
 
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
+fit_netherlands_model_1 %>% forecast::checkresiduals()
 
-#iceland_data <- total %>% 
-  #filter(Country_Name == "Iceland") %>% 
-  #select(Year, Number_Deaths) 
+```
+For the ARIMA(0,1,1) the residuals pass the LB test. Now, let's see the residuals for the ARIMA(0,1,0):
 
-#modIce <- lm(log(Number_Deaths)~Year, data=iceland_data)
-#summary(modIce)
+```{r}
+fit_netherlands_model_2 <- arima(log_netherlands_data, order = c(0,1,0))
+fit_netherlands_model_2
+
+fit_netherlands_model_2 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_netherlands_model_2))
+```
+
+```{r}
+forecasted_netherlands_1<- forecast(fit_netherlands_model_1,level = c(95), h=3, bootstrap = TRUE)
+autoplot(forecasted_netherlands_1)
+```
+
+```{r}
+exp_forecasted_netherlands_fitted_1 <- exp(forecasted_netherlands_1$fitted)
+
+data_netherlands_1 <- netherlands_data %>% 
+  mutate(exp_fitted = exp_forecasted_netherlands_fitted_1) 
+data_netherlands_1
+
+ggplot(data_netherlands_1, aes(x = year)) +
+  geom_line(aes(y = number_deaths, color = "Actual")) +
+  geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
+  labs(title = "Actual vs Fitted TB Deaths in Netherlands with Arima(0,1,1)",
+       x = "Year", y = "Number of Deaths",
+       color = "Legend") +
+  ylim(0,1000) +
+  xlim(1980,2021) +
+  theme_minimal()
+```
+
+```{r}
+
+df_forecast_netherlands_1 <- data.frame(
+  year = time(forecasted_netherlands_1$mean),
+  mean = exp(forecasted_netherlands_1$mean),
+  lower = exp(forecasted_netherlands_1$lower[,1]),
+  upper = exp(forecasted_netherlands_1$upper[,1])
+)
+
+df_forecast_netherlands_1
 
 ```
 
-## Stationary series analysis
+```{r}
 
-*Spain*
+ggplot() +
+  geom_line(data = netherlands_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_netherlands_1, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_netherlands_1, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "blue") +
+  scale_color_manual(values = c("Actual" = "black", "Forecast" = "blue")) +
+  labs(title = "Forecast",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  coord_cartesian(xlim = c(2012, 2024), ylim = c(0,1000)) +
+  theme_minimal()
 
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-spain_data <- as_tsibble(spain_data,index = Year)
 
-spain_trend <- spain_data %>% 
-  model(exponential = TSLM(log(Number_Deaths)~ trend()))
+```
+Now let's study the second adjusted model for the Netherlands series.
 
-spain_trends <- spain_trend |> forecast(h = 15)
-
-spain_data |>
-  autoplot(Number_Deaths) +
-  geom_line(data = fitted(spain_trend),
-            aes(y = .fitted, colour = .model)) +
-  autolayer(spain_trends, alpha = 0.5, level = 95)
+```{r}
+forecasted_netherlands_2 <- forecast(fit_netherlands_model_2,level = c(95), h=3, bootstrap = TRUE)
+autoplot(forecasted_netherlands_2)
 ```
 
-*Switzerland*
+```{r}
+exp_forecasted_netherlands_fitted_2 <- exp(forecasted_netherlands_2$fitted)
 
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-switzerland_data <- as_tsibble(switzerland_data,index = Year)
+data_netherlands_2 <- netherlands_data %>% 
+  mutate(exp_fitted = exp_forecasted_netherlands_fitted_2) 
+data_netherlands_2
 
-switzerland_trend <- switzerland_data %>% 
-  model(exponential = TSLM(log(Number_Deaths)~ trend()))
-
-switzerland_trends <- switzerland_trend |> forecast(h = 15)
-
-switzerland_data |>
-  autoplot(Number_Deaths) +
-  geom_line(data = fitted(switzerland_trend),
-            aes(y = .fitted, colour = .model)) +
-  autolayer(switzerland_trends, alpha = 0.5, level = 95)
+ggplot(data_netherlands_2, aes(x = year)) +
+  geom_line(aes(y = number_deaths, color = "Actual")) +
+  geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
+  labs(title = "Actual vs Fitted TB Deaths in Netherlands with Arima(0,1,1)",
+       x = "Year", y = "Number of Deaths",
+       color = "Legend") +
+  ylim(0,1000) +
+  xlim(1980,2021) +
+  theme_minimal()
 ```
 
-*Netherlands*
+```{r}
 
-```{r, warning=FALSE, message=FALSE, echo= FALSE}
-netherlands_data <- as_tsibble(netherlands_data,index = Year)
+df_forecast_netherlands_2 <- data.frame(
+  year = time(forecasted_netherlands_2$mean),
+  mean = exp(forecasted_netherlands_2$mean),
+  lower = exp(forecasted_netherlands_2$lower[,1]),
+  upper = exp(forecasted_netherlands_2$upper[,1])
+)
 
-netherlands_trend <- netherlands_data %>% 
-  model(exponential = TSLM(log(Number_Deaths)~ trend()))
+df_forecast_netherlands_2
 
-netherlands_trends <- netherlands_trend |> forecast(h = 15)
-
-netherlands_data |>
-  autoplot(Number_Deaths) +
-  geom_line(data = fitted(netherlands_trend),
-            aes(y = .fitted, colour = .model)) +
-  autolayer(netherlands_trends, alpha = 0.5, level = 95)
 ```
+
+```{r}
+
+ggplot() +
+  geom_line(data = netherlands_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_netherlands_2, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_netherlands_2, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "blue") +
+  scale_color_manual(values = c("Actual" = "black", "Forecast" = "blue")) +
+  labs(title = "Forecast",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  coord_cartesian(xlim = c(2012, 2024), ylim = c(0,1000)) +
+  theme_minimal()
+
+
+```
+
+
 
