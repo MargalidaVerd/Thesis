@@ -373,18 +373,30 @@ spain_data <- chosen_countries %>%
   select(year, number_deaths) %>% 
   arrange(year)
 
-vctsfr::plot_ts(ts(spain_data$number_deaths, start = c(1951), frequency = 1))
+#vctsfr::plot_ts(ts(spain_data$number_deaths, start = c(1951), frequency = 1)) + 
+#  theme_minimal() 
 
 log_spain_data <- ts(log(spain_data$number_deaths), start = c(1951), frequency = 1)
 
-vctsfr::plot_ts(log_spain_data)
+plot_ts(log_spain_data) +
+  theme_minimal() +
+  labs(
+    title = "Log-transformed time series of tuberculosis deaths in Spain",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
 ```
 
 Let's check the ACF and PACF of the series:
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 par(mfrow = c(2,2))
-acf(log_spain_data)
+acf(log_spain_data) 
 pacf(log_spain_data)
 ```
 
@@ -411,20 +423,50 @@ fit_spain
 fit_spain %>% forecast::checkresiduals()
 
 ```
+
 To properly check the normality of the residuals, we do the Shapiro-Wilk test:
+
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 shapiro.test(residuals(fit_spain))
 ```
 
 The ARIMA model applied is the ARIMA(0,1,0), as it is the best suited fot the series. Residual diagnostics support this model. The Ljung-Box test yields a p-value of 0.9954, suggesting no significant autocorrelation in the residuals. However, the Shapiro-Wilk test for normality gave a p-value of 5.88×10⁻⁵, leading us to reject the null hypothesis of normality. This implies that while the model captures the time dependence effectively, the residuals deviate from normality. To account for this, bootstrapping was enabled during forecasting to generate more robust prediction intervals.
 
-Setting bootstrap = TRUE enables the computation of prediction intervals using bootstrapped innovations rather than assuming normality. This is particularly useful when residuals show slight deviations from normality or the model is very sensitive to error structure. Bootstrapping provides more robust and possibly asymmetric confidence intervals. However, it also increases computational time.
+Setting bootstrap = TRUE enables the computation of prediction intervals using bootstrapped innovations rather than assuming normality.
 
 Now, to forecast future values, we apply the `forecast()`function:
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 forecasted_spain <- forecast(fit_spain,level = c(95), h=3, bootstrap = TRUE)
-autoplot(forecasted_spain)
+
+par(mfrow = c(2,2))
+
+autoplot(forecasted_spain) +
+  theme_minimal() +
+  labs(
+    title = "Forecasts from ARIMA(0,1,0) for Spain series",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+autoplot(forecasted_spain) +
+  theme_minimal() +
+  labs(
+    title = "Forecasts from ARIMA(0,1,0) for Spain series",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  xlim(2010,2024) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
 ```
 
 Next, we back-transform the forecasts to the original scale by applying the exponential function:
@@ -435,18 +477,48 @@ data <- spain_data %>%
   mutate(exp_fitted = exp_forecasted_spain_fitted) 
 data
 ```
+
 The fitted values and forecasts are then plotted alongside the original series to assess model performance:
+
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 ggplot(data, aes(x = year)) +
   geom_line(aes(y = number_deaths, color = "Actual")) +
   geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
-  labs(title = "Actual vs Fitted TB Deaths in Spain",
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4",  
+               "Fitted" = "#ff7f0e")  
+  ) +
+  labs(title = "Actual vs Fitted TB deaths in Spain",
+       x = "Year", y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+ggplot(data, aes(x = year)) +
+  geom_line(aes(y = number_deaths, color = "Actual")) +
+  geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4",  
+               "Fitted" = "#ff7f0e")  
+  ) +
+  labs(title = "Actual vs Fitted TB deaths in Spain",
+       subtitle = "Zoomed-in segment of the TB mortality time series in Spain (1980–2021)",
        x = "Year", y = "Number of Deaths",
        color = "Legend") +
   ylim(0,1000) +
   xlim(1980,2021) +
-  theme_minimal()
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
 ```
 
 To display the forecasts an their associated uncerainty, we prepare a data frame with the exponential of the forecast and confidence intervals:
@@ -463,6 +535,7 @@ df_forecast_spain <- data.frame(
 df_forecast_spain
 
 ```
+
 Finally, we visualize the forecasts:
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
@@ -470,13 +543,34 @@ Finally, we visualize the forecasts:
 ggplot() +
   geom_line(data = spain_data, aes(x = year, y = number_deaths, color = "Actual")) +
   geom_line(data = df_forecast_spain, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
-  geom_ribbon(data = df_forecast_spain, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "blue") +
-  scale_color_manual(values = c("Actual" = "black", "Forecast" = "blue")) +
+  geom_ribbon(data = df_forecast_spain, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "#ff7f0e") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")) +
+  labs(title = "Forecast for Spain data",
+       subtitle = "Complete series",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13) )
+
+
+ggplot() +
+  geom_line(data = spain_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_spain, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_spain, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "#ff7f0e") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")) +
   labs(title = "TB Death forecast for Spain data",
+       subtitle = "Zoomed-in forecast (2012-2024)",
        x = "Year", y = "Number deaths",
        color = "Serie") +
   coord_cartesian(xlim = c(2012, 2024), ylim = c(0,1000)) +
-  theme_minimal()
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13) )
 
 
 ```
@@ -487,163 +581,336 @@ The ARIMA(0,1,0) model applied to the log-transformed TB death series for Spain 
 
 We now apply the same methodology to the Netherlands, a country that also shows a notable long-term decrease in TB deaths.
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 netherlands_data <- chosen_countries %>% 
   filter(country_name == "Netherlands") %>% 
   select(year, number_deaths) %>% 
   arrange(year)
-netherlands_data
 
-vctsfr::plot_ts(ts(netherlands_data$number_deaths, start = c(1950), frequency = 1))
+#vctsfr::plot_ts(ts(netherlands_data$number_deaths, start = c(1950), frequency = 1))
 
 log_netherlands_data <- ts(log(netherlands_data$number_deaths), start = c(1950), frequency = 1)
 
-vctsfr::plot_ts(log_spain_data)
+plot_ts(log_netherlands_data) +
+  theme_minimal() +
+  labs(
+    title = "Log-transformed time series of tuberculosis deaths in the Netherlands",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
 ```
 
-
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 par(mfrow = c(2,2))
 acf(log_netherlands_data)
 pacf(log_netherlands_data)
 ```
-We difference the series once:
+We first apply the same model as for Spain data: ARIMA(0,1,0).
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+fit_netherlands <- arima(log_netherlands_data, order = c(0,1,0))
+fit_netherlands
+```
+The AIC coefficient seems to be low, so at first sight might seem a good approach. Let us check the residuals:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+fit_netherlands%>% forecast::checkresiduals()
+shapiro.test(residuals(fit_netherlands))
+```
+The residuals pass the Ljung-Box test for autocorrelation; however, they do not pass the normality test. For that reason, we will forecast future values using the bootsrap feature.
+
+Now, we difference the series:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 log_netherlands_data_diff <- log_netherlands_data %>% 
   diff(differences = 1) 
 ```
 
-Now, let's check again the ACF and PACF:
+We begin the forecast:
 
-```{r}
-par(mfrow = c(2,2))
-acf(log_netherlands_data_diff)
-pacf(log_netherlands_data_diff)
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+forecasted_netherlands <- forecast(fit_netherlands,level = c(95), h=3, bootstrap = TRUE)
+forecasted_netherlands
+
+autoplot(forecasted_netherlands) +
+  theme_minimal() +
+  labs(
+    title = "Forecasts from ARIMA(0,1,0) for Netherlands series",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+autoplot(forecasted_netherlands) +
+  theme_minimal() +
+  labs(
+    title = "Forecasts from ARIMA(0,1,0) for Netherlands series",
+    subtitle = "Zoomed-in series (2010-2024)",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  xlim(2010,2024) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
 ```
-The ACF slowly shows a possible significant lag at $t-1$. We will present two different models: ARIMA(0,1,0) and ARIMA(0,1,1).
+A noticeable observation is that the predicted values remain constant over a three-year period, suggesting that the model may not be well-suited for forecasting this time series. Nevertheless, let's visualize the actual versus fitted values to better assess the model's performance.
 
-```{r}
-fit_netherlands_model_1 <- forecast::auto.arima(log_netherlands_data)
-fit_netherlands_model_1
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+exp_forecasted_netherlands_fitted <- exp(forecasted_netherlands$fitted)
 
-fit_netherlands_model_1 %>% forecast::checkresiduals()
+data_netherlands <- netherlands_data %>% 
+  mutate(exp_fitted = round(exp_forecasted_netherlands_fitted)) %>% 
+  mutate(difference = round(exp_fitted - number_deaths))
+
+data_netherlands
 
 ```
-For the ARIMA(0,1,1) the residuals pass the LB test. Now, let's see the residuals for the ARIMA(0,1,0):
 
-```{r}
-fit_netherlands_model_2 <- arima(log_netherlands_data, order = c(0,1,0))
-fit_netherlands_model_2
+The differences between the real values and the fitted ones differ significantly. Graphically:
 
-fit_netherlands_model_2 %>% forecast::checkresiduals()
-shapiro.test(residuals(fit_netherlands_model_2))
-```
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
-```{r}
-forecasted_netherlands_1<- forecast(fit_netherlands_model_1,level = c(95), h=3, bootstrap = TRUE)
-autoplot(forecasted_netherlands_1)
-```
-
-```{r}
-exp_forecasted_netherlands_fitted_1 <- exp(forecasted_netherlands_1$fitted)
-
-data_netherlands_1 <- netherlands_data %>% 
-  mutate(exp_fitted = exp_forecasted_netherlands_fitted_1) 
-data_netherlands_1
-
-ggplot(data_netherlands_1, aes(x = year)) +
+ggplot(data_netherlands, aes(x = year)) +
   geom_line(aes(y = number_deaths, color = "Actual")) +
   geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
-  labs(title = "Actual vs Fitted TB Deaths in Netherlands with Arima(0,1,1)",
+  labs(title = "Actual vs Fitted TB Deaths in Netherlands with Arima(0,1,0)",
        x = "Year", y = "Number of Deaths",
        color = "Legend") +
-  ylim(0,1000) +
-  xlim(1980,2021) +
-  theme_minimal()
-```
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4",  
+               "Fitted" = "#ff7f0e")  
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13))
 
-```{r}
-
-df_forecast_netherlands_1 <- data.frame(
-  year = time(forecasted_netherlands_1$mean),
-  mean = exp(forecasted_netherlands_1$mean),
-  lower = exp(forecasted_netherlands_1$lower[,1]),
-  upper = exp(forecasted_netherlands_1$upper[,1])
-)
-
-df_forecast_netherlands_1
-
-```
-
-```{r}
-
-ggplot() +
-  geom_line(data = netherlands_data, aes(x = year, y = number_deaths, color = "Actual")) +
-  geom_line(data = df_forecast_netherlands_1, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
-  geom_ribbon(data = df_forecast_netherlands_1, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "blue") +
-  scale_color_manual(values = c("Actual" = "black", "Forecast" = "blue")) +
-  labs(title = "Forecast",
-       x = "Year", y = "Number deaths",
-       color = "Serie") +
-  coord_cartesian(xlim = c(2012, 2024), ylim = c(0,1000)) +
-  theme_minimal()
-
-
-```
-Now let's study the second adjusted model for the Netherlands series.
-
-```{r}
-forecasted_netherlands_2 <- forecast(fit_netherlands_model_2,level = c(95), h=3, bootstrap = TRUE)
-autoplot(forecasted_netherlands_2)
-```
-
-```{r}
-exp_forecasted_netherlands_fitted_2 <- exp(forecasted_netherlands_2$fitted)
-
-data_netherlands_2 <- netherlands_data %>% 
-  mutate(exp_fitted = exp_forecasted_netherlands_fitted_2) 
-data_netherlands_2
-
-ggplot(data_netherlands_2, aes(x = year)) +
+ggplot(data_netherlands, aes(x = year)) +
   geom_line(aes(y = number_deaths, color = "Actual")) +
   geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
-  labs(title = "Actual vs Fitted TB Deaths in Netherlands with Arima(0,1,1)",
+  labs(title = "Actual vs Fitted TB Deaths in Netherlands with Arima(0,1,0)",
+       subtitle = "Zoomed-in Netherlands forecast (1980-2021)",
        x = "Year", y = "Number of Deaths",
        color = "Legend") +
-  ylim(0,1000) +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4",  
+               "Fitted" = "#ff7f0e")  
+  ) +
+  ylim(0,300) +
   xlim(1980,2021) +
-  theme_minimal()
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13))
 ```
+We see the forecasted points and boundaries in exponential scale:
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
-df_forecast_netherlands_2 <- data.frame(
-  year = time(forecasted_netherlands_2$mean),
-  mean = exp(forecasted_netherlands_2$mean),
-  lower = exp(forecasted_netherlands_2$lower[,1]),
-  upper = exp(forecasted_netherlands_2$upper[,1])
+df_forecast_netherlands <- data.frame(
+  year = time(forecasted_netherlands$mean),
+  mean = exp(forecasted_netherlands$mean),
+  lower = exp(forecasted_netherlands$lower[,1]),
+  upper = exp(forecasted_netherlands$upper[,1])
 )
 
-df_forecast_netherlands_2
+df_forecast_netherlands
 
 ```
+Finally, we plot the forecasted values in the original scale:
 
-```{r}
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
 
 ggplot() +
   geom_line(data = netherlands_data, aes(x = year, y = number_deaths, color = "Actual")) +
   geom_line(data = df_forecast_netherlands_2, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
-  geom_ribbon(data = df_forecast_netherlands_2, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "blue") +
-  scale_color_manual(values = c("Actual" = "black", "Forecast" = "blue")) +
-  labs(title = "Forecast",
+  geom_ribbon(data = df_forecast_netherlands_2, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "#ff7f0e") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")) +
+  labs(title = "TB Death forecast for Netherlands data",
        x = "Year", y = "Number deaths",
        color = "Serie") +
-  coord_cartesian(xlim = c(2012, 2024), ylim = c(0,1000)) +
-  theme_minimal()
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13) )
+
+ggplot() +
+  geom_line(data = netherlands_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_netherlands_2, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_netherlands_2, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "#ff7f0e") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")) +
+  labs(title = "TB Death forecast for Netherlands data",
+       subtitle = "Zoomed-in forecast (2012-2024) - ARIMA(0,1,0)",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  theme_minimal() +
+  coord_cartesian(xlim = c(2012, 2024), ylim = c(0,100)) +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13) )
 
 
 ```
+As seen, ARIMA(0,1,0) may not fit well for this series. Now, we will use the `auto.arima()` function in order to present a new model:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+fit_netherlands_auto <- forecast::auto.arima(log_netherlands_data)
+fit_netherlands_auto
+
+```
+The model suggested is an ARIMA(0,1,1). Let us check the residuals:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+fit_netherlands_auto %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_netherlands_auto))
+```
+
+The residuals of this new model pass the autocorrelation test; however, they neither pass the normality test. Once again, bootstrap will be applied when forecasting.
 
 
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+forecasted_netherlands_auto <- forecast(fit_netherlands_auto,level = c(95), h=3, bootstrap = TRUE)
+forecasted_netherlands_auto
+
+autoplot(forecasted_netherlands_auto) +
+  theme_minimal() +
+  labs(
+    title = "Forecasts from ARIMA(0,1,1) for Netherlands series",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+autoplot(forecasted_netherlands_auto) +
+  theme_minimal() +
+  labs(
+    title = "Forecasts from ARIMA(0,1,1) for Netherlands series",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  ylim(2,5) +
+  xlim(2010,2026) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+```
+Let's back-transform the forecasted values into the original scale:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+exp_forecasted_netherlands_fitted_auto <- exp(forecasted_netherlands_auto$fitted)
+
+data_netherlands_auto <- netherlands_data %>% 
+  mutate(exp_fitted = exp_forecasted_netherlands_fitted_auto) 
+
+data_netherlands_auto
+```
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+ggplot(data_netherlands_auto, aes(x = year)) +
+  geom_line(aes(y = number_deaths, color = "Actual")) +
+  geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
+  labs(title = "Actual vs Fitted TB Deaths in Netherlands with Arima(0,1,0)",
+       x = "Year", y = "Number of Deaths",
+       color = "Legend") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4",  
+               "Fitted" = "#ff7f0e")  
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13))
+
+
+ggplot(data_netherlands_auto, aes(x = year)) +
+  geom_line(aes(y = number_deaths, color = "Actual")) +
+  geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
+  labs(title = "Actual vs Fitted TB Deaths in Netherlands with Arima(0,1,1)",
+       x = "Year", y = "Number of Deaths",
+       color = "Legend") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4",  
+               "Fitted" = "#ff7f0e")  
+  ) +
+  ylim(0,250) +
+  xlim(1980,2021) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13))
+```
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+df_forecast_netherlands_auto <- data.frame(
+  year = time(forecasted_netherlands_auto$mean),
+  mean = exp(forecasted_netherlands_auto$mean),
+  lower = exp(forecasted_netherlands_auto$lower[,1]),
+  upper = exp(forecasted_netherlands_auto$upper[,1])
+)
+
+df_forecast_netherlands_auto
+
+```
+Finally, let's see the prediction in the original scale:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+ggplot() +
+  geom_line(data = netherlands_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_netherlands_auto, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_netherlands_1, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2,fill = "#ff7f0e") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")) +
+  labs(title = "TB Death forecast for Netherlands data",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13) )
+
+ggplot() +
+  geom_line(data = netherlands_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_netherlands_auto, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_netherlands_1, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "#ff7f0e") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")) +
+  labs(title = "TB Death forecast for Netherlands data",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  coord_cartesian(xlim = c(2012, 2024), ylim = c(0,50)) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13) )
+
+
+```
+## Sweden
 
