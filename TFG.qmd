@@ -356,7 +356,7 @@ grid.arrange(
 
 ```
 
-## Detrending series
+## ARIMA models
 
 In order to build accurate time series models, the data must be stationary—meaning it should exhibit constant mean and variance over time. Since developed countries (e.g., Spain, the Netherlands) show a strong downward trend in TB death counts over the years, we begin by transforming the original data using logarithms. This transformation stabilizes the variance and linearizes exponential trends, making the data more suitable for ARIMA modeling.
 
@@ -372,6 +372,7 @@ spain_data <- chosen_countries %>%
   filter(country_name == "Spain") %>% 
   select(year, number_deaths) %>% 
   arrange(year)
+
 
 #vctsfr::plot_ts(ts(spain_data$number_deaths, start = c(1951), frequency = 1)) + 
 #  theme_minimal() 
@@ -405,6 +406,7 @@ Upon inspecting the ACF and PACF plots, we observe a strong autocorrelation in t
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
 log_spain_data_diff <- log_spain_data %>% 
   diff(differences = 1) 
+plot_ts(log_spain_data_diff)
 ```
 
 The resulting ACF and PACF plots indicate that autocorrelations have been adequately removed, and the series is now stationary:
@@ -912,5 +914,512 @@ ggplot() +
 
 
 ```
-## Sweden
+### Sweden
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+sweden_data <- chosen_countries %>% 
+  filter(country_name == "Sweden") %>% 
+  select(year, number_deaths) %>% 
+  arrange(year)
+
+log_sweden_data <- ts(log(sweden_data$number_deaths), start = 1951, frequency = 1)
+
+
+plot_ts(log_sweden_data) +
+  theme_minimal() +
+  labs(
+    title = "Log-transformed time series of tuberculosis deaths in Sweden",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+```
+In order to determine the ARIMA model order, we need to visualize the ACF and PACF
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+par(mfrow = c(2,2))
+acf(log_sweden_data) 
+pacf(log_sweden_data)
+```
+Data is clearly non-stationary, so we difference once the time series:
+
+```{r}
+log_sweden_data_diff <- log_sweden_data %>% 
+  diff(differences = 1)
+
+plot_ts(log_sweden_data_diff)
+```
+We have stationarized our series; now we need to determine the ARIMA order.
+
+```{r}
+acf(log_sweden_data_diff)
+pacf(log_sweden_data_diff)
+```
+Options:
+- ARIMA(1,1,0): captures the first order difference and the first lag of the PACF function (model 1).
+- ARIMA(0,1,1): captures the first order difference and the first lag of the ACF function (model 2).
+
+We begin the comparison with the first model:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+fit_sweden_model_1 <- arima(log_sweden_data, order = c(1,1,0))
+fit_sweden_model_1
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+fit_sweden_model_1 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_sweden_model_1))
+```
+
+Now, to forecast future values, we apply the `forecast()`function:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+forecasted_sweden_model_1 <- forecast(fit_sweden_model_1,level = c(95), h=3, bootstrap = TRUE)
+
+par(mfrow = c(2,2))
+
+autoplot(forecasted_sweden_model_1) +
+  theme_minimal() +
+  labs(
+    title = "Forecasts from ARIMA(1,1,0) for Sweden series",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+autoplot(forecasted_sweden_model_1) +
+  theme_minimal() +
+  labs(
+    title = "Forecasts from ARIMA(1,1,0) for Sweden series",
+    subtitle = "Zoomed-in series (2010-2024)",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  xlim(2010,2024) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+```
+
+Next, we back-transform the forecasts to the original scale by applying the exponential function:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+exp_forecasted_sweden_1_fitted <- exp(forecasted_sweden_model_1$fitted)
+
+sweden_model_1_data <- sweden_data %>% 
+  mutate(exp_fitted = exp_forecasted_sweden_1_fitted) 
+
+sweden_model_1_data
+```
+
+The fitted values and forecasts are then plotted alongside the original series to assess model performance:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+ggplot(sweden_model_1_data, aes(x = year)) +
+  geom_line(aes(y = number_deaths, color = "Actual")) +
+  geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4",  
+               "Fitted" = "#ff7f0e")  
+  ) +
+  labs(title = "Actual vs Fitted TB deaths in Sweden for the ARIMA(1,1,0)",
+       x = "Year", y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+ggplot(sweden_model_1_data, aes(x = year)) +
+  geom_line(aes(y = number_deaths, color = "Actual")) +
+  geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4",  
+               "Fitted" = "#ff7f0e")  
+  ) +
+  labs(title = "Actual vs Fitted TB deaths in Sweden",
+       subtitle = "Zoomed-in segment of the TB mortality time series in Sweden (1980–2021)",
+       x = "Year", y = "Number of Deaths",
+       color = "Legend") +
+  ylim(0,300) +
+  xlim(1980,2021) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+```
+
+To display the forecasts an their associated uncerainty, we prepare a data frame with the exponential of the forecast and confidence intervals:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+df_forecast_sweden_1 <- data.frame(
+  year = time(forecasted_sweden_model_1$mean),
+  mean = exp(forecasted_sweden_model_1$mean),
+  lower = exp(forecasted_sweden_model_1$lower[,1]),
+  upper = exp(forecasted_sweden_model_1$upper[,1])
+)
+
+df_forecast_sweden_1
+
+```
+
+Finally, we visualize the forecasts:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+ggplot() +
+  geom_line(data = sweden_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_sweden_1, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_sweden_1, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "#ff7f0e") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")) +
+  labs(title = "Forecast for Sweden data",
+       subtitle = "Complete series",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13) )
+
+
+ggplot() +
+  geom_line(data = sweden_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_sweden_1, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_sweden_1, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "#ff7f0e") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")) +
+  labs(title = "TB Death forecast for Sweden data",
+       subtitle = "Zoomed-in forecast (2012-2024)",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  coord_cartesian(xlim = c(2012, 2024), ylim = c(0,50)) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13) )
+
+
+```
+Now, let's study the second model:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+fit_sweden_model_2 <- forecast::auto.arima(log_sweden_data)
+fit_sweden_model_2
+```
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+fit_sweden_model_2 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_sweden_model_2))
+```
+
+Now, to forecast future values, we apply the `forecast()`function:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+forecasted_sweden_model_2 <- forecast(fit_sweden_model_2,level = c(95), h=3, bootstrap = TRUE)
+forecasted_sweden_model_2
+
+par(mfrow = c(2,2))
+
+autoplot(forecasted_sweden_model_2) +
+  theme_minimal() +
+  labs(
+    title = "Forecasts from ARIMA(0,1,1) for Sweden series",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+autoplot(forecasted_sweden_model_2) +
+  theme_minimal() +
+  labs(
+    title = "Forecasts from ARIMA(0,1,1) for Sweden series",
+    subtitle = "Zoomed-in series (2010-2024)",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  xlim(2010,2024) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+```
+
+Next, we back-transform the forecasts to the original scale by applying the exponential function:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+exp_forecasted_sweden_2_fitted <- exp(forecasted_sweden_model_2$fitted)
+
+sweden_model_2_data <- sweden_data %>% 
+  mutate(exp_fitted = exp_forecasted_sweden_2_fitted) 
+
+sweden_model_2_data
+```
+
+The fitted values and forecasts are then plotted alongside the original series to assess model performance:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+ggplot(sweden_model_2_data, aes(x = year)) +
+  geom_line(aes(y = number_deaths, color = "Actual")) +
+  geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4",  
+               "Fitted" = "#ff7f0e")  
+  ) +
+  labs(title = "Actual vs Fitted TB deaths in Sweden for the ARIMA(0,1,1)",
+       x = "Year", y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+ggplot(sweden_model_2_data, aes(x = year)) +
+  geom_line(aes(y = number_deaths, color = "Actual")) +
+  geom_line(aes(y = exp_fitted, color = "Fitted"), linetype = "dashed") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4",  
+               "Fitted" = "#ff7f0e")  
+  ) +
+  labs(title = "Actual vs Fitted TB deaths in Sweden for the ARIMA(0,1,1)",
+       subtitle = "Zoomed-in segment of the TB mortality time series in Sweden (1980–2021)",
+       x = "Year", y = "Number of Deaths",
+       color = "Legend") +
+  ylim(0,300) +
+  xlim(1980,2021) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+```
+
+To display the forecasts an their associated uncerainty, we prepare a data frame with the exponential of the forecast and confidence intervals:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+df_forecast_sweden_2 <- data.frame(
+  year = time(forecasted_sweden_model_2$mean),
+  mean = exp(forecasted_sweden_model_2$mean),
+  lower = exp(forecasted_sweden_model_2$lower[,1]),
+  upper = exp(forecasted_sweden_model_2$upper[,1])
+)
+
+df_forecast_sweden_2
+
+```
+
+Finally, we visualize the forecasts:
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+
+ggplot() +
+  geom_line(data = sweden_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_sweden_2, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_sweden_2, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "#ff7f0e") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")) +
+  labs(title = "Forecast for Sweden data",
+       subtitle = "Complete series",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13) )
+
+
+ggplot() +
+  geom_line(data = sweden_data, aes(x = year, y = number_deaths, color = "Actual")) +
+  geom_line(data = df_forecast_sweden_2, aes(x = year, y = mean, color = "Forecast"), linetype = "dashed") +
+  geom_ribbon(data = df_forecast_sweden_2, aes(x = year, ymin = lower, ymax = upper), alpha = 0.2, fill = "#ff7f0e") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")) +
+  labs(title = "TB Death forecast for Sweden data",
+       subtitle = "Zoomed-in forecast (2012-2024)",
+       x = "Year", y = "Number deaths",
+       color = "Serie") +
+  coord_cartesian(xlim = c(2012, 2024), ylim = c(0,50)) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 12),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13) )
+
+
+```
+
+
+### Switzerland
+
+```{r, warning=FALSE, message=FALSE, echo= FALSE}
+switzerland_data <- chosen_countries %>% 
+  filter(country_name == "Switzerland") %>% 
+  select(year, number_deaths) %>% 
+  arrange(year)
+
+log_switzerland_data = ts(log(switzerland_data$number_deaths), start = 1951, frequency = 1)
+
+plot_ts(log_switzerland_data) +   
+  theme_minimal() +
+  labs(
+    title = "Log-transformed time series of tuberculosis deaths in Switzerland",
+    x = "Year",
+    y = "Number of deaths"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+```
+
+
+
+```{r}
+plot_ts(log_switzerland_data %>% diff(differences = 1))
+forecast::auto.arima(log_switzerland_data)
+```
+
+
+
+### Romania
+ 
+We begin now the study for Romania data; remember that this series does not present a strong exponential trend as the previous countries, so the analysis should differ. We begin by plotting the time series:
+
+```{r}
+romania_data <- chosen_countries %>% 
+  filter(country_name == "Romania") %>% 
+  select(year, number_deaths) %>% 
+  arrange(year) #1959-2019
+
+romania_ts <- ts(romania_data$number_deaths, start = 1959, frequency = 1)
+plot_ts(romania_ts) +   
+  theme_minimal() +
+  labs(
+    title = "Time series of tuberculosis deaths in Romania",
+    x = "Year",
+    y = "Number of deaths"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+```
+We see that it has a strong decreasing trend until 1980, and from that year onward it begins to rise again until 2000, when it starts to decline definitively. 
+
+```{r}
+#par(mfrow = c(2,2))
+acf(romania_ts)
+pacf(romania_ts)
+
+```
+The ACF shows strong autocorrelation between lags; let us apply a first order difference.
+
+```{r}
+romania_ts_diff <- romania_ts %>% diff(differences = 1)
+plot_ts(romania_ts_diff )
+
+```
+It seems to not be stationary, so we can difference twice:
+
+```{r}
+romania_ts_diff_2 <- romania_ts %>% diff(differences = 2)
+plot_ts(romania_ts_diff_2)
+
+acf(romania_ts_diff_2)
+pacf(romania_ts_diff_2)
+```
+
+## Train / Test
+
+```{r}
+log_spain_data_train <- window(log_spain_data, end = c(2011))
+log_spain_data_test <- window(log_spain_data, start = c(2012))
+
+```
+
+```{r}
+fit_spain_train <- forecast::auto.arima(log_spain_data_train)
+summary(fit_spain_train)
+
+```
+
+
+```{r}
+horizon <- length(log_spain_data_test)
+forecasted_spain_test <- forecast(fit_spain_train, h = horizon, bootstrap = TRUE)
+
+```
+
+```{r}
+
+predicted_log <- forecasted_spain_test$mean
+actual_log <- log_spain_data_test
+
+
+accuracy(predicted_log, actual_log)
+
+
+predicted_original <- exp(predicted_log)
+actual_original <- exp(actual_log)
+
+accuracy(predicted_original, actual_original)
+
+```
+
+```{r}
+df_test_eval <- data.frame(
+  year = 2012:2021,
+  actual = actual_original,
+  predicted = predicted_original
+)
+
+df_test_eval %>% 
+  mutate(diff = actual -predicted)
+
+ggplot(df_test_eval, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = "TB Deaths in Spain: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+
+```
 
