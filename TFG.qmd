@@ -42,6 +42,7 @@ library(tseries)
 library(FinTS)
 library(fable)
 library(vctsfr)
+library(fpp2)
 
 
 ```
@@ -373,7 +374,6 @@ spain_data <- chosen_countries %>%
   select(year, number_deaths) %>% 
   arrange(year)
 
-
 #vctsfr::plot_ts(ts(spain_data$number_deaths, start = c(1951), frequency = 1)) + 
 #  theme_minimal() 
 
@@ -382,7 +382,7 @@ log_spain_data <- ts(log(spain_data$number_deaths), start = c(1951), frequency =
 plot_ts(log_spain_data) +
   theme_minimal() +
   labs(
-    title = "Log-transformed time series of tuberculosis deaths in Spain",
+    title = " ",
     x = "Year",
     y = "Log(Number of deaths)"
   ) +
@@ -1367,53 +1367,297 @@ pacf(romania_ts_diff_2)
 ```
 
 ## Train / Test
+### Spain
 
 ```{r}
-log_spain_data_train <- window(log_spain_data, end = c(2011))
-log_spain_data_test <- window(log_spain_data, start = c(2012))
+# We divide the logarithmic datset into training and testing datasets.
 
+log_spain_data_train <- ts(log_spain_data[0:60], start = 1951, frequency = 1)
+log_spain_data_test <- ts(log_spain_data[61:71], start = 2011, frequency = 1)
+
+plot_ts(log_spain_data_train) +
+  theme_minimal() +
+  labs(
+    title = "Log-transformed time series of tuberculosis deaths in Spain",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
 ```
+It is clear that the training set is not stationary; a solution could be differencing the series.
 
-```{r}
-fit_spain_train <- forecast::auto.arima(log_spain_data_train)
-summary(fit_spain_train)
+```{r, warning=FALSE}
+log_spain_data_train_diff <- log_spain_data_train %>% diff(differences = 1)
 
-```
-
-
-```{r}
-horizon <- length(log_spain_data_test)
-forecasted_spain_test <- forecast(fit_spain_train, h = horizon, bootstrap = TRUE)
-
-```
-
-```{r}
-
-predicted_log <- forecasted_spain_test$mean
-actual_log <- log_spain_data_test
-
-
-accuracy(predicted_log, actual_log)
-
-
-predicted_original <- exp(predicted_log)
-actual_original <- exp(actual_log)
-
-accuracy(predicted_original, actual_original)
-
-```
-
-```{r}
-df_test_eval <- data.frame(
-  year = 2012:2021,
-  actual = actual_original,
-  predicted = predicted_original
+df_spain <- data.frame(
+  year = as.numeric(time(log_spain_data_train_diff)),
+  value = as.numeric(log_spain_data_train_diff)
 )
 
-df_test_eval %>% 
-  mutate(diff = actual -predicted)
+df_lm <- df_spain[-c(1, 2), ]
 
-ggplot(df_test_eval, aes(x = year)) +
+plot_ts(log_spain_data_train_diff) +
+  geom_smooth(method = "lm", se = TRUE, color = "steelblue", linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    title = " ",
+    x = "Year",
+    y = " "
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+
+
+ggplot(df, aes(x = year, y = value)) +
+  geom_point(color = "black") +                            
+  geom_smooth(data = df_lm, method = "lm", se = FALSE,        
+              color = "steelblue", linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    title = " ",
+    x = "Year",
+    y = " "
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+
+
+```
+Although the series may initially appear stationary in the plot, the scatter pattern suggests otherwise. To assess this formally, we apply the KPSS test to the differenced series:
+
+```{r}
+kpss.test(log_spain_data_train_diff)
+```
+
+The p-value obtained is $0.03468$. Therefore, we reject the null hypothesis of stationarity. This indicates that the differenced series is still not stationary, and a second-order difference is required.
+
+```{r}
+log_spain_data_train_diff <- log_spain_data_train %>% 
+  diff(differences = 2)
+
+plot_ts(log_spain_data_train_diff) +
+  #geom_smooth(method = "lm", se = TRUE, color = "steelblue", linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    title = " ",
+    x = "Year",
+    y = " "
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+```
+We check the new differenced time series:
+
+```{r}
+kpss.test(log_spain_data_train_diff)
+```
+The p-value now is greater than $0.05$, so we guarenteed the stationarity. Now, let's check the ACF and PACF plots.
+
+```{r}
+par(mfrow = c(2,2))
+acf(log_spain_data_train_diff) 
+pacf(log_spain_data_train_diff)
+
+```
+
+Based on the two previous plots, we have to determine the orders for the ARIMA models. We would do the selection sistematically, meaning that we will choose the two best models (in terms of AIC value) out of all possible options.
+
+
+```{r}
+ma_coef <- c(0,1,2)
+ar_coef <- c(0,1)
+
+for (p in ar_coef) {
+  for (q in ma_coef) {
+    arima_fit <- arima(log_spain_data_train, order = c(p, 2, q))
+    cat("ARIMA(", p, ",2,", q, ")\n", sep = "")
+    print(arima_fit$coef)
+    cat("AIC:", AIC(arima_fit), "\n\n")
+  }
+}
+
+
+```
+We will study the following models:
+
+- ARIMA(0,2,1)
+- ARIMA(1,2,1)
+
+#### First model: ARIMA(0,2,1)
+
+Let's check the first model:
+
+```{r}
+fit_spain_1 <- Arima(log_spain_data_train, order = c(0,2,1))
+summary(fit_spain_1)
+```
+Now the residuals of the first model:
+
+```{r}
+fit_spain_1 %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_spain_1))
+```
+The Ljung-Box test determines that the residuals of the model do not present autocorrelation. As so, the Shapiro-Wilk test determines that the residuals are approximately normally distributed. This means that the model satisfies the residuals considerations.
+
+We begin the forecast; we will forecast the testing dataset values.
+
+```{r}
+horizon_spain <- length(log_spain_data_test)
+
+forecasted_spain_1 <- forecast(fit_spain_1, h=horizon_spain, level = c(95),bootstrap = FALSE)
+forecasted_spain_1
+
+```
+
+If we compared the predicted logarithmic points versus the original logarithmic points:
+
+```{r}
+predicted_spain_1 <- forecasted_spain_1$mean
+actual_spain <- log_spain_data_test
+
+test_log_spain_model_1 <- data.frame(
+  year = 2011:2021,
+  actual = actual_spain,
+  predicted = predicted_spain_1,
+  diff = abs(actual_spain - predicted_spain_1)
+)
+
+test_log_spain_model_1
+```
+
+We can plot the results:
+
+
+```{r}
+ggplot(test_log_spain_model_1, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = " Logarithmic TB deaths in Spain: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+It is clear that the forecasted points do not modelize correctly the original logarithmic data. The forecast for the original data can be seen in the following plot:
+
+```{r}
+predicted_original_spain_1 <- exp(predicted_spain_1)
+actual_original_spain <- exp(actual_spain)
+
+
+test_spain_model_1 <- data.frame(
+  year = 2011:2021,
+  actual = actual_original_spain,
+  predicted = predicted_original_spain_1
+)
+
+test_spain_model_1 %>% 
+  mutate(diff = abs(actual -predicted))
+
+ggplot(test_spain_model_1, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = "TB Deaths in Spain: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+Finally, let's check the accuracy of the model:
+
+```{r}
+accuracy(predicted_original_spain_1, actual_original_spain)
+```
+
+
+
+#### Second model: ARIMA(1,2,1)
+
+We study now the second model.
+
+```{r}
+fit_spain_2 <- Arima(log_spain_data_train, order = c(1,2,1))
+summary(fit_spain_2)
+
+```
+We analyze the residuals of the model:
+
+```{r}
+fit_spain_2 %>% 
+  forecast::checkresiduals()
+
+shapiro.test(residuals(fit_spain_2))
+```
+The Ljung-Box test allows to ensure that the residuals do not present any correlation. Moreover, the residuals also pass the Shapiro-Wilk test, meaning that they ditribute normally. Now, let's see the forecast on the testing dataset.
+
+```{r}
+forecasted_spain_2 <- forecast(fit_spain_2, h=horizon_spain, level=c(95), bootstrap = TRUE)
+forecasted_spain_2
+```
+
+Let's compare the forecasted values and the actual ones:
+
+```{r}
+
+predicted_spain_2 <- forecasted_spain_2$mean
+actual_spain <- log_spain_data_test
+
+test_log_spain_model_2 <- data.frame(
+  year = 2011:2021,
+  actual = actual_spain,
+  predicted = predicted_spain_2,
+  diff = abs(predicted_spain_2 - actual_spain)
+)
+
+test_log_spain_model_2
+
+```
+We can plot the results:
+
+
+```{r}
+ggplot(test_log_spain_model_2, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = " Logarithmic TB deaths in Spain: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+```{r}
+
+predicted_original_spain_2 <- exp(predicted_spain_2)
+actual_original_spain <- exp(actual_spain)
+
+```
+
+We can see the forecasted points using the orginial scale:
+
+```{r}
+test_spain_model_2 <- data.frame(
+  year = 2011:2021,
+  actual = actual_original_spain,
+  predicted = predicted_original_spain_2
+)
+
+test_spain_model_2 %>% 
+  mutate(diff = abs(actual -predicted))
+
+ggplot(test_spain_model_2, aes(x = year)) +
   geom_line(aes(y = actual, color = "Actual")) +
   geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
   scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
@@ -1422,4 +1666,415 @@ ggplot(df_test_eval, aes(x = year)) +
   theme_minimal()
 
 ```
+Finally, let's check the accuracy of the model:
+
+```{r}
+accuracy(predicted_original_spain_2, actual_original_spain)
+
+```
+
+
+### Netherlands
+
+We can do the same with Netherlands data.
+
+```{r}
+netherlands_data <- chosen_countries %>% 
+  filter(country_name == "Netherlands") %>% 
+  select(year, number_deaths) %>% 
+  arrange(year)
+
+max(netherlands_data$year)
+
+log_netherlands_data <- ts(log(netherlands_data$number_deaths), start = c(1950), frequency = 1)
+
+log_neth_data_train <- ts(log_netherlands_data[0:62], start = 1950, frequency = 1)
+log_neth_data_test <- ts(log_netherlands_data[63:73], start = 2012, frequency = 1)
+
+plot_ts(log_neth_data_train) +
+  theme_minimal() +
+  labs(
+    title = "Log-transformed time series of tuberculosis deaths in Netherlands",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+```
+We try now to remove the trend of the time series.
+
+```{r}
+log_neth_data_train_diff <- log_neth_data_train %>% diff(differences = 1) 
+
+plot_ts(log_neth_data_train_diff)+
+  theme_minimal()
+```
+We apply the KPSS test to ensure stationarity:
+
+```{r}
+kpss.test(log_neth_data_train_diff)
+```
+The p-value is bigger than 0,05, so the time series is now stationary.
+
+Now let's check the ACF and PACF plots:
+
+```{r}
+acf(log_neth_data_train_diff)
+pacf(log_neth_data_train_diff)
+```
+Let's select the two best models, following the same schema as in Spain data.
+
+```{r}
+ar_coef <- c(0,1,2,3)
+ma_coef <- c(0,1,2,3)
+
+for (p in ar_coef) {
+  for (q in ma_coef) {
+    arima_fit <- arima(log_neth_data_train, order = c(p, 1, q))
+    cat("ARIMA(", p, ",1,", q, ")\n", sep = "")
+    print(arima_fit$coef)
+    cat("AIC:", AIC(arima_fit), "\n\n")
+  }
+}
+```
+The ARIMA models selected for the study are:
+
+- ARIMA(1,1,3)
+- ARIMA(3,1,3)
+
+#### First model: ARIMA(1,1,3)
+
+```{r}
+fit_neth_1 <- Arima(log_neth_data_train, order = c(1,1,3))
+summary(fit_neth_1)
+```
+Let's check the residuals of the model:
+
+```{r}
+fit_neth_1 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_neth_1))
+```
+The residuals tests from above determine that the residuals present no correlation, but they do not distribute normally. The negative effect this can produce to the forecast will be controlled with the bootstrap attribute.
+
+Let's forecast
+
+```{r}
+horizon_neth <- length(log_neth_data_test)
+forecasted_neth_1 <- forecast(fit_neth_1, h=horizon_neth, level = c(95), bootstrap = TRUE)
+forecasted_neth_1
+```
+If we compare the predicted logarithmic points versus the original logarithmic points:
+
+```{r}
+predicted_neth_1 <- forecasted_neth_1$mean
+
+test_log_neth_model_1 <- data.frame(
+  year = 2011:2021,
+  actual = log_neth_data_test,
+  predicted = predicted_neth_1,
+  diff = abs(log_neth_data_test - predicted_neth_1)
+)
+
+test_log_neth_model_1
+```
+
+We can plot the results:
+
+```{r}
+ggplot(test_log_neth_model_1, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = " Logarithmic TB deaths in Netherland: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+The forecast for the original data can be seen in the following plot:
+
+```{r}
+
+predicted_original_neth_1 <- exp(predicted_neth_1)
+actual_original_neth <- exp(log_neth_data_test)
+
+
+test_original_neth_model_1 <- data.frame(
+  year = 2011:2021,
+  actual = actual_original_neth,
+  predicted = predicted_original_neth_1
+)
+
+test_original_neth_model_1 %>% 
+  mutate(diff = abs(actual -predicted))
+
+ggplot(test_original_neth_model_1, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = "TB Deaths in the Netherlands: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+
+Finally, we need to check the accuracy of the model:
+
+```{r}
+accuracy(predicted_original_neth_1, actual_original_neth)
+```
+
+#### Second model: ARIMA(3,1,3)
+
+```{r}
+fit_neth_2 <- Arima(log_neth_data_train, order = c(3,1,3))
+summary(fit_neth_2)
+```
+Let's check the residuals of the model:
+
+
+```{r}
+fit_neth_2 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_neth_2))
+```
+
+As the previous model, the residuals present no correlation, and they do not follow a normal distribution.
+
+```{r}
+forecasted_neth_2 <- forecast(fit_neth_2, h = horizon_neth, level = c(95), bootstrap = TRUE)
+forecasted_neth_2
+```
+If we compare the predicted logarithmic points versus the original logarithmic points:
+
+```{r}
+predicted_neth_2 <- forecasted_neth_2$mean
+
+test_log_neth_model_2 <- data.frame(
+  year = 2011:2021,
+  actual = log_neth_data_test,
+  predicted = predicted_neth_2,
+  diff = abs(log_neth_data_test - predicted_neth_2)
+)
+
+test_log_neth_model_2
+```
+
+We can plot the results:
+
+```{r}
+ggplot(test_log_neth_model_2, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = " Logarithmic TB deaths in Netherland: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+The forecast for the original data can be seen in the following plot:
+
+```{r}
+
+predicted_original_neth_2 <- exp(predicted_neth_2)
+actual_original_neth <- exp(log_neth_data_test)
+
+
+test_original_neth_model_2 <- data.frame(
+  year = 2011:2021,
+  actual = actual_original_neth,
+  predicted = predicted_original_neth_2
+)
+
+test_original_neth_model_2 %>% 
+  mutate(diff = abs(actual -predicted))
+
+ggplot(test_original_neth_model_2, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = "TB Deaths in the Netherlands: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+
+Finally, we need to check the accuracy of the model:
+
+```{r}
+accuracy(predicted_original_neth_2, actual_original_neth)
+```
+
+
+### Sweden
+
+We begin the Sweden data study.
+
+```{r}
+sweden_data <- chosen_countries %>% 
+  filter(country_name == "Sweden") %>% 
+  select(year, number_deaths) %>% 
+  arrange(year)
+
+log_sweden_data <- ts(log(sweden_data$number_deaths), start = c(1951), frequency = 1)
+
+log_sweden_data_train <- ts(log_sweden_data[0:62], start = 1951, frequency = 1)
+log_sweden_data_test <- ts(log_sweden_data[63:72], start = 2013, frequency = 1)
+
+plot_ts(log_sweden_data_train) +
+  theme_minimal() +
+  labs(
+    title = "Log-transformed time series of tuberculosis deaths in Sweden",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+```
+We try now to remove the trend of the time series.
+
+```{r}
+log_sweden_data_train_diff <- log_sweden_data_train %>% diff(differences = 1) 
+
+plot_ts(log_sweden_data_train_diff)+
+  theme_minimal()
+```
+We apply the KPSS test to ensure stationarity:
+
+```{r}
+kpss.test(log_sweden_data_train_diff)
+```
+Now let's check the ACF and PACF plots:
+
+```{r}
+acf(log_sweden_data_train_diff)
+pacf(log_sweden_data_train_diff)
+```
+Let's select the two best models, following the same schema as in Spain data.
+
+```{r}
+ar_coef <- c(0,1)
+ma_coef <- c(0,1)
+
+for (p in ar_coef) {
+  for (q in ma_coef) {
+    arima_fit <- arima(log_sweden_data_train, order = c(p, 1, q))
+    cat("ARIMA(", p, ",1,", q, ")\n", sep = "")
+    print(arima_fit$coef)
+    cat("AIC:", AIC(arima_fit), "\n\n")
+  }
+}
+```
+The ARIMA models selected for the study are:
+
+- ARIMA(1,1,0)
+- ARIMA(1,1,1)
+
+#### First model: ARIMA(1,2,3)
+
+```{r}
+fit_sweden_1 <- Arima(log_sweden_data_train, order = c(1,1,0))
+summary(fit_sweden_1)
+```
+Let's check the residuals of the model:
+
+```{r}
+fit_sweden_1 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_sweden_1))
+```
+The residuals tests from above determine that the residuals present no correlation, but they do not distribute normally. The negative effect this can produce to the forecast will be controlled with the bootstrap attribute.
+
+Let's forecast
+
+```{r}
+horizon_sweden <- length(log_sweden_data_test)
+forecasted_sweden_1 <- forecast(fit_sweden_1, h=horizon_neth, level = c(95), bootstrap = TRUE)
+forecasted_sweden_1
+```
+If we compare the predicted logarithmic points versus the original logarithmic points:
+
+```{r}
+predicted_sweden_1 <- forecasted_sweden_1$mean
+
+test_log_sweden_model_1 <- data.frame(
+  year = 2013:2022,
+  actual = log_sweden_data_test,
+  predicted = predicted_sweden_1,
+  diff = abs(log_sweden_data_test - predicted_sweden_1)
+)
+
+test_log_sweden_model_1
+```
+
+We can plot the results:
+
+```{r}
+ggplot(test_log_neth_model_1, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = " Logarithmic TB deaths in Netherland: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+The forecast for the original data can be seen in the following plot:
+
+```{r}
+
+predicted_original_neth_1 <- exp(predicted_neth_1)
+actual_original_neth <- exp(log_neth_data_test)
+
+
+test_original_neth_model_1 <- data.frame(
+  year = 2011:2021,
+  actual = actual_original_neth,
+  predicted = predicted_original_neth_1
+)
+
+test_original_neth_model_1 %>% 
+  mutate(diff = abs(actual -predicted))
+
+ggplot(test_original_neth_model_1, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = "TB Deaths in the Netherlands: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+
+Finally, we need to check the accuracy of the model:
+
+```{r}
+accuracy(predicted_original_neth_1, actual_original_neth)
+```
+
+
+## ARIMAX
+
+First, let's plot the exogenous variables for the study:
+
+```{r}
+spain_data_ex <- complete_data %>% 
+  filter(country_name == "Spain") %>% 
+  select(year, number_deaths, population, gdp_capita) %>% 
+  arrange(year)
+
+spain_data_ex
+
+min(spain_data_ex$year)
+
+pob_ts <- ts(spain_data_ex$population, start = 1951, end = 2021, frequency = 1)
+gdp_ts <- ts(spain_data_ex$gdp_capita, start = 1960, end = 2021, frequency = 1)
+gdp_ts
+plot_ts(pob_ts) 
+plot_ts(gdp_ts)
+```
+
+### Spain
+
+```{r}
+
+```
+
 
