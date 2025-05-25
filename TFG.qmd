@@ -1967,13 +1967,13 @@ for (p in ar_coef) {
 ```
 The ARIMA models selected for the study are:
 
-- ARIMA(1,1,0)
+- ARIMA(0,1,0)
 - ARIMA(1,1,1)
 
-#### First model: ARIMA(1,2,3)
+#### First model: ARIMA(0,1,0)
 
 ```{r}
-fit_sweden_1 <- Arima(log_sweden_data_train, order = c(1,1,0))
+fit_sweden_1 <- Arima(log_sweden_data_train, order = c(0,1,0))
 summary(fit_sweden_1)
 ```
 Let's check the residuals of the model:
@@ -1982,15 +1982,30 @@ Let's check the residuals of the model:
 fit_sweden_1 %>% forecast::checkresiduals()
 shapiro.test(residuals(fit_sweden_1))
 ```
+Notice that the residuals for this model do not pass any of the tests: Ljung-Box, meaning that they still capture some correlation between lags, and neither the Shapiro-Wilk test, meaning that they do not distribute normally. Basing on this results, the best option is to select another order for the ARIMA models. We will study the ARIMA(1,1,0).
+
+```{r}
+fit_sweden_1 <- Arima(log_sweden_data_train, order = c(1,1,0))
+summary(fit_sweden_1)
+```
+Let's analyze the residuals of the test:
+
+```{r}
+fit_sweden_1 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_sweden_1))
+```
+
 The residuals tests from above determine that the residuals present no correlation, but they do not distribute normally. The negative effect this can produce to the forecast will be controlled with the bootstrap attribute.
 
-Let's forecast
+Let's forecast:
 
 ```{r}
 horizon_sweden <- length(log_sweden_data_test)
-forecasted_sweden_1 <- forecast(fit_sweden_1, h=horizon_neth, level = c(95), bootstrap = TRUE)
+forecasted_sweden_1 <- forecast(fit_sweden_1, h=horizon_sweden, level = c(95), bootstrap = TRUE)
 forecasted_sweden_1
 ```
+Notice that from 2025 towards, the forecasted points are all the same. 
+
 If we compare the predicted logarithmic points versus the original logarithmic points:
 
 ```{r}
@@ -2009,36 +2024,37 @@ test_log_sweden_model_1
 We can plot the results:
 
 ```{r}
-ggplot(test_log_neth_model_1, aes(x = year)) +
+ggplot(test_log_sweden_model_1, aes(x = year)) +
   geom_line(aes(y = actual, color = "Actual")) +
   geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
   scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
-  labs(title = " Logarithmic TB deaths in Netherland: Actual vs Predicted (2012–2021)",
+  labs(title = " Logarithmic TB deaths in Sweden: Actual vs Predicted (2012–2021)",
        x = "Year", y = "Number of Deaths", color = "Legend") +
   theme_minimal()
 ```
-The forecast for the original data can be seen in the following plot:
+
+It is clear that the forecasted points do not predict correctly the future values. However, let's see the forecast in the original scale of the data:
 
 ```{r}
 
-predicted_original_neth_1 <- exp(predicted_neth_1)
-actual_original_neth <- exp(log_neth_data_test)
+predicted_original_sweden_1 <- exp(predicted_sweden_1)
+actual_original_sweden <- exp(log_sweden_data_test)
 
 
-test_original_neth_model_1 <- data.frame(
-  year = 2011:2021,
-  actual = actual_original_neth,
-  predicted = predicted_original_neth_1
+test_original_sweden_model_1 <- data.frame(
+  year = 2013:2022,
+  actual = actual_original_sweden,
+  predicted = predicted_original_sweden_1
 )
 
-test_original_neth_model_1 %>% 
+test_original_sweden_model_1 %>% 
   mutate(diff = abs(actual -predicted))
 
-ggplot(test_original_neth_model_1, aes(x = year)) +
+ggplot(test_original_sweden_model_1, aes(x = year)) +
   geom_line(aes(y = actual, color = "Actual")) +
   geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
   scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
-  labs(title = "TB Deaths in the Netherlands: Actual vs Predicted (2012–2021)",
+  labs(title = "TB Deaths in Sweden: Actual vs Predicted (2012–2021)",
        x = "Year", y = "Number of Deaths", color = "Legend") +
   theme_minimal()
 ```
@@ -2046,10 +2062,356 @@ ggplot(test_original_neth_model_1, aes(x = year)) +
 Finally, we need to check the accuracy of the model:
 
 ```{r}
-accuracy(predicted_original_neth_1, actual_original_neth)
+accuracy(predicted_original_sweden_1, actual_original_sweden)
 ```
 
+#### Second model: ARIMA(1,1,1)
 
+```{r}
+fit_sweden_2 <- Arima(log_sweden_data_train, order = c(1,1,1))
+summary(fit_sweden_2)
+```
+
+Let's check the residuals:
+
+```{r}
+fit_sweden_2 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_sweden_2))
+```
+
+The residuals for the model still present autocorrelation and do not follow a normal distribution; in this case, we are going to change the order of the model again. The model proposed is an ARIMA(0,1,1):
+
+```{r}
+fit_sweden_2 <- Arima(log_sweden_data_train, order = c(0,1,1))
+summary(fit_sweden_2)
+```
+
+Now, let's check the residuals of the model:
+
+```{r}
+fit_sweden_2 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_sweden_2))
+```
+
+The residuals do not pass the Shapiro-Wilk normality test (p-value = $0.049$); however, the model has no correlation left in the residuals.
+
+We can now forecast:
+
+```{r}
+forecasted_sweden_2 <- forecast(fit_sweden_2, h = horizon_sweden, level = c(95), bootstrap = TRUE)
+forecasted_sweden_2
+```
+The model do not forecast well. We will study another type of models for Sweden forecast.
+
+### Switzerland
+
+
+```{r}
+switzerland_data <- chosen_countries %>% 
+  filter(country_name == "Switzerland") %>% 
+  select(year, number_deaths) %>% 
+  arrange(year)
+
+log_switzerland_data = ts(log(switzerland_data$number_deaths), start = 1951, frequency = 1)
+plot_ts(log_switzerland_data) +   
+  theme_minimal() +
+  labs(
+    title = "Log-transformed time series of tuberculosis deaths in Switzerland",
+    x = "Year",
+    y = "Number of deaths"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+```
+We divide the data into a training set and a testing set:
+
+```{r}
+log_switz_train <- ts(log_switzerland_data[0:60], start = 1951, frequency = 1)
+log_switz_test <- ts(log_switzerland_data[61:71], start = 2011, frequency = 1)
+```
+As seen, the time series is not stationary, so we need to difference the series:
+
+```{r}
+log_switz_train_diff <- log_switz_train %>% diff()
+plot_ts(log_switz_train_diff) +
+  theme_minimal()
+kpss.test(log_switz_train_diff)
+```
+With just one difference, the logarithmic data of Switzerland passes the stationary test. Let's check the ACF and PACF plots:
+
+```{r}
+acf(log_switz_train_diff)
+pacf(log_switz_train_diff)
+```
+The differenced time series does not present any correlation left, so the model that we will apply is just ARIMA(0,1,0).
+
+```{r}
+fit_switz <- Arima(log_switz_train, order = c(0,1,0))
+summary(fit_switz)
+```
+Now, let's check the residuals:
+
+```{r}
+fit_switz %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_switz))
+```
+The residuals seem to not pass the Shapiro-Wilk test. Now, let's forecast:
+
+```{r}
+horizon_switz <- length(log_switz_test)
+forecasted_switz <- forecast(fit_switz, h = horizon_switz, level = c(95), bootstrap = TRUE)
+forecasted_switz
+```
+Well, the model do not predict correctly the future values. 
+
+### Romania
+
+Now, let's study Romania data.
+
+```{r}
+romania_data <- chosen_countries %>% 
+  filter(country_name == "Romania") %>% 
+  select(year, number_deaths) %>% 
+  arrange(year) 
+
+
+romania_ts <- ts(romania_data$number_deaths, start = 1959, frequency = 1)
+plot_ts(romania_ts) +   
+  theme_minimal() +
+  labs(
+    title = "Time series of tuberculosis deaths in Romania",
+    x = "Year",
+    y = "Number of deaths"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+```
+
+This data is a bit different from the rest, as it do not present a monotone decaying trend. Let's try to convert the series into a stationary series.
+
+```{r}
+romania_train <- ts(romania_ts[0:50], start = 1959, frequency = 1)
+romania_test <- ts(romania_ts[50:60], start = 2009, frequency = 1)
+
+
+```
+
+```{r}
+romania_train_diff <- romania_train %>% diff(differences = 2)
+kpss.test(romania_train_diff)
+
+
+plot_ts(romania_train_diff) + 
+  theme_minimal()
+```
+Let's check the ACF and PACF plots:
+
+```{r}
+acf(romania_train_diff)
+pacf(romania_train_diff)
+```
+```{r}
+ma_coef <- c(0,2)
+ar_coef <- c(0,2)
+
+for (p in ar_coef) {
+  for (q in ma_coef) {
+    arima_fit <- Arima(romania_train, order = c(p, 2, q))
+    cat("ARIMA(", p, ",2,", q, ")\n", sep = "")
+    print(arima_fit$coef)
+    cat("AIC:", AIC(arima_fit), "\n\n")
+  }
+}
+```
+We will study: 
+- ARIMA(0,2,2)
+- ARIMA(2,2,0)
+
+#### First model: ARIMA(0,2,2)
+
+```{r}
+fit_romania_1 <- Arima(romania_train, order = c(0,2,2))
+fit_romania_1
+```
+The residuals of the series:
+
+```{r}
+fit_romania_1 %>%  forecast::checkresiduals()
+shapiro.test(residuals(fit_romania_1))
+```
+
+Now, let's forecast:
+
+```{r}
+horizon_romania <- length(romania_test)
+forecasted_romania_1 <- forecast(fit_romania_1, h = horizon_romania, level = c(95), bootstrap = TRUE)
+forecasted_romania_1
+```
+If we compare the predicted logarithmic points versus the original logarithmic points:
+
+```{r}
+predicted_romania_1 <- forecasted_romania_1$mean
+
+test_romania_1 <- data.frame(
+  year = 2009:2019,
+  actual = romania_test,
+  predicted = predicted_romania_1,
+  diff = abs(romania_test - predicted_romania_1)
+)
+
+test_romania_1
+```
+
+We can plot the results:
+
+```{r}
+ggplot(test_romania_1, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = " Logarithmic TB deaths in Romania: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+It seems to have cached the decaying trend. Finally, we check the accuracy of the test:
+
+```{r}
+accuracy(predicted_romania_1, romania_test)
+```
+
+#### Second model: ARIMA(2,2,0)
+
+```{r}
+fit_romania_2 <- Arima(romania_train, order = c(2,2,0))
+fit_romania_2
+```
+
+```{r}
+fit_romania_2 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_romania_2))
+```
+
+The residuals pass the two important tests. Let's forecast:
+
+```{r}
+forecasted_romania_2 <- forecast(fit_romania_2, h = horizon_romania, level = c(95), bootstrap = FALSE)
+forecasted_romania_2
+```
+
+Now, we can compare the results:
+
+```{r}
+predicted_romania_2 <- forecasted_romania_1$mean
+
+test_romania_2 <- data.frame(
+  year = 2009:2019,
+  actual = romania_test,
+  predicted = predicted_romania_2,
+  diff = abs(romania_test - predicted_romania_2)
+)
+
+test_romania_2
+```
+
+We can plot the results:
+
+```{r}
+ggplot(test_romania_2, aes(x = year)) +
+  geom_line(aes(y = actual, color = "Actual")) +
+  geom_line(aes(y = predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = " Logarithmic TB deaths in Romania: Actual vs Predicted (2012–2021)",
+       x = "Year", y = "Number of Deaths", color = "Legend") +
+  theme_minimal()
+```
+Finally, let's check the accuracy of the model:
+
+```{r}
+accuracy(predicted_romania_2, romania_test)
+```
+
+### Latvia
+
+Finally, we are goinf to study Latvia data.
+
+```{r}
+latvia_data <-chosen_countries %>% 
+  filter(country_name == "Latvia") %>% 
+  select(year, number_deaths) %>% 
+  arrange(year) 
+
+latvia_ts <- ts(latvia_data$number_deaths, start = 1980, frequency = 1)
+plot_ts(latvia_ts) +   
+  theme_minimal() +
+  labs(
+    title = "Time series of tuberculosis deaths in Latvia",
+    x = "Year",
+    y = "Number of deaths"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+```
+```{r}
+latvia_train <- ts(latvia_ts[0:30], start = 1980, frequency = 1)
+latvia_test <- ts(latvia_ts[30:41], start = 2011, frequency = 1)
+
+```
+
+Let's plot Latvia train set:
+
+```{r}
+plot_ts(latvia_train) +
+  theme_minimal()
+```
+
+It is clearly non-stationary. We need to difference the time series.
+
+```{r}
+latvia_train_diff <- latvia_train %>% diff()
+plot_ts(latvia_train_diff) +
+  theme_minimal()
+
+kpss.test(latvia_train_diff)
+```
+
+We only need a first order difference to get the series stationary. Now, let's study the ACF and PACF plots:
+
+```{r}
+acf(latvia_train_diff)
+pacf(latvia_train_diff)
+```
+The model that we can apply is ARIMA(0,1,0).
+
+```{r}
+fit_latvia <- Arima(latvia_train, order = c(0,1,0))
+summary(fit_latvia)
+```
+
+We need to study the residuals:
+
+```{r}
+fit_latvia %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_latvia))
+```
+
+Finally, let's forecast:
+
+```{r}
+horizon_latvia <- length(latvia_test)
+forecasted_latvia <- forecast(fit_latvia, h = horizon_latvia, level = c(95), bootstrap = FALSE)
+forecasted_latvia
+```
+Well, the model has predicted the same values for all testing years.
 ## ARIMAX
 
 First, let's plot the exogenous variables for the study:
