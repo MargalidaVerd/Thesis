@@ -1370,6 +1370,14 @@ pacf(romania_ts_diff_2)
 ### Spain
 
 ```{r}
+
+spain_data <- complete_data %>% 
+  filter(country_name == "Spain") %>% 
+  select(year, number_deaths, population, gdp_capita) %>% 
+  arrange(year)
+
+log_spain_data <- ts(log(spain_data$number_deaths), start = c(1951), frequency = 1)
+
 # We divide the logarithmic datset into training and testing datasets.
 
 log_spain_data_train <- ts(log_spain_data[0:60], start = 1951, frequency = 1)
@@ -2412,31 +2420,105 @@ forecasted_latvia <- forecast(fit_latvia, h = horizon_latvia, level = c(95), boo
 forecasted_latvia
 ```
 Well, the model has predicted the same values for all testing years.
+
 ## ARIMAX
 
-First, let's plot the exogenous variables for the study:
+In this section we will study ARIMAX models; ARIMAX models are ARIMA models that include some exogenous variables in order to get better forecastings rather than basic ARIMA. In our study, we will consider two exogenous variables: Gross Domestic Product per capita and the country population. 
+
+First, we visualize these series.
 
 ```{r}
-spain_data_ex <- complete_data %>% 
-  filter(country_name == "Spain") %>% 
-  select(year, number_deaths, population, gdp_capita) %>% 
+
+ex_variables <- complete_data %>% 
+  filter(country_name %in% c("Spain", "Switzerland", "Sweden", "Netherlands", "Latvia", "Romania")) %>% 
+  select(year, country_name, population,  gdp_capita) %>% 
   arrange(year)
 
-spain_data_ex
 
-min(spain_data_ex$year)
 
-pob_ts <- ts(spain_data_ex$population, start = 1951, end = 2021, frequency = 1)
-gdp_ts <- ts(spain_data_ex$gdp_capita, start = 1960, end = 2021, frequency = 1)
-gdp_ts
-plot_ts(pob_ts) 
-plot_ts(gdp_ts)
+ex_variables %>%  
+  ggplot(aes(x = year, y = population/1000000, color = country_name)) +  
+  geom_line() +
+  scale_color_manual(values = c(
+    "Romania" = "#04A3BDFF",    
+    "Switzerland" = "#F0BE3DFF",    
+    "Latvia" = "#931E18FF",    
+    "Sweden" = "#DA7901FF",   
+    "Spain" = "#247D3FFF",    
+    "Netherlands" = "#20235BFF"    
+  )) + 
+  theme_minimal() +
+  ggtitle("Chosen countries population trends")+
+  theme(legend.position = "right") +
+  ylab("Population (in millions)")
+
+```
+In stark contrast with the other countries, Spain population has a strong increasing trend, reaching nearly 50 million in 2010. Romania follows Spain as the second country with a bigger population; however, the difference between both countries is nearly 20 million. The Netherlands, Sweden and Switzerland present similar increasing trends. Finally, Latvia is the country with the lowest population. Moreover, it shows a slow decaying tendency from beyond the 1990. More information: WIKIPEDIA (Letonia perdió más de un 23% de su población por dos factores: la caída de su tasa de fertilidad, y un saldo migratorio negativo que se acentuó con la crisis económica de 2008.)
+
+Now, let's visualize the GDP per capita tendencies:
+
+```{r}
+ex_variables %>%  
+  ggplot(aes(x = year, y = gdp_capita, color = country_name)) +  
+  geom_line() +
+  scale_color_manual(values = c(
+    "Romania" = "#04A3BDFF",    
+    "Switzerland" = "#F0BE3DFF",    
+    "Latvia" = "#931E18FF",    
+    "Sweden" = "#DA7901FF",   
+    "Spain" = "#247D3FFF",    
+    "Netherlands" = "#20235BFF"    
+  )) + 
+  theme_minimal() +
+  ggtitle("Chosen countries GDP per capita trends")+
+  theme(legend.position = "right") +
+  ylab("GDP per capita (in current U.S. dollars)")
+```
+Now, the outlook is quite different; Switzerland leads the list, with a big rise from the 2000, exceeding the 75000 U.S dollars per capita. Following Switzerland, the Netherlands and Sweden have a very similar pattern. Next to them, Spain is the fourth country. It has a top in 2007, and then it shows a little decaying. Finally, Romania and Latvia close the list. 
+
+
+```{r}
+complete_data %>% 
+  dplyr::select(country_name, gdp_capita) %>% 
+  na.exclude() %>%  
+  group_by(country_name) %>% 
+  count() %>% 
+  arrange(desc(n)) %>% 
+  data.frame() %>% 
+  filter(country_name %in% c("Romania", "Latvia"))
 ```
 
 ### Spain
 
+We begin by studying Spain. First, we need to check if the exogenous variables and the study variable have the same length. Remember, we are forecasting on the logarithmic Spain training set.
+
 ```{r}
+spain_data
+length(spain_data$number_deaths)
+length(spain_data$population)
+length(na.omit(spain_data$gdp_capita))
 
 ```
+
+Notice that the population regressor has the same length as the original series, but the gdp per capita time series no. 
+
+We can shorten the number of deaths time series, in order to get the same length in both series.
+
+```{r}
+
+log_population_spain <- ts(log(spain_data$population), start = 1951, frequency = 1)
+log_population_spain_train <- ts(log_population_spain[0:60], start = 1951, frequency = 1)
+log_population_spain_test <- ts(log_population_spain[61:71], start = 2011, frequency = 1)
+
+fit_arimax_spain <- auto.arima(log_spain_data_train, xreg = log_population_spain_train)
+
+fs <- forecast(fit_arimax_spain, xreg = log_population_spain_test, h= horizon_spain)
+fs_exp <- exp(fs$mean)
+```
+
+```{r}
+fit_arimax_spain %>%  forecast::checkresiduals()
+```
+
 
 
