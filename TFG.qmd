@@ -374,6 +374,7 @@ spain_data <- chosen_countries %>%
   select(year, number_deaths) %>% 
   arrange(year)
 
+
 #vctsfr::plot_ts(ts(spain_data$number_deaths, start = c(1951), frequency = 1)) + 
 #  theme_minimal() 
 
@@ -1365,6 +1366,11 @@ plot_ts(romania_ts_diff_2)
 acf(romania_ts_diff_2)
 pacf(romania_ts_diff_2)
 ```
+```{r}
+# calculating lengths
+
+length(spain_data$number_deaths)
+```
 
 ## Train / Test
 ### Spain
@@ -1380,8 +1386,11 @@ log_spain_data <- ts(log(spain_data$number_deaths), start = c(1951), frequency =
 
 # We divide the logarithmic datset into training and testing datasets.
 
-log_spain_data_train <- ts(log_spain_data[0:60], start = 1951, frequency = 1)
+log_spain_data_train <- ts(log_spain_data[1:60], start = 1951, frequency = 1)
 log_spain_data_test <- ts(log_spain_data[61:71], start = 2011, frequency = 1)
+
+length(log_spain_data_train)
+length(log_spain_data_test)
 
 plot_ts(log_spain_data_train) +
   theme_minimal() +
@@ -1692,12 +1701,15 @@ netherlands_data <- chosen_countries %>%
   select(year, number_deaths) %>% 
   arrange(year)
 
-max(netherlands_data$year)
+length(netherlands_data$number_deaths)
 
 log_netherlands_data <- ts(log(netherlands_data$number_deaths), start = c(1950), frequency = 1)
 
-log_neth_data_train <- ts(log_netherlands_data[0:62], start = 1950, frequency = 1)
-log_neth_data_test <- ts(log_netherlands_data[63:73], start = 2012, frequency = 1)
+log_neth_data_train <- ts(log_netherlands_data[1:61], start = 1950, frequency = 1)
+log_neth_data_test <- ts(log_netherlands_data[62:73], start = 2012, frequency = 1)
+
+length(log_neth_data_train)
+length(log_neth_data_test)
 
 plot_ts(log_neth_data_train) +
   theme_minimal() +
@@ -1921,10 +1933,16 @@ sweden_data <- chosen_countries %>%
   select(year, number_deaths) %>% 
   arrange(year)
 
+length(sweden_data$number_deaths)
+
 log_sweden_data <- ts(log(sweden_data$number_deaths), start = c(1951), frequency = 1)
 
-log_sweden_data_train <- ts(log_sweden_data[0:62], start = 1951, frequency = 1)
-log_sweden_data_test <- ts(log_sweden_data[63:72], start = 2013, frequency = 1)
+log_sweden_data_train <- ts(log_sweden_data[1:61], start = 1951, frequency = 1)
+log_sweden_data_test <- ts(log_sweden_data[62:72], start = 2012, frequency = 1)
+
+length(log_sweden_data_train)
+length(log_sweden_data_test)
+
 
 plot_ts(log_sweden_data_train) +
   theme_minimal() +
@@ -2120,6 +2138,8 @@ switzerland_data <- chosen_countries %>%
   select(year, number_deaths) %>% 
   arrange(year)
 
+length(switzerland_data$number_deaths)
+
 log_switzerland_data = ts(log(switzerland_data$number_deaths), start = 1951, frequency = 1)
 plot_ts(log_switzerland_data) +   
   theme_minimal() +
@@ -2138,8 +2158,11 @@ plot_ts(log_switzerland_data) +
 We divide the data into a training set and a testing set:
 
 ```{r}
-log_switz_train <- ts(log_switzerland_data[0:60], start = 1951, frequency = 1)
+log_switz_train <- ts(log_switzerland_data[1:60], start = 1951, frequency = 1)
 log_switz_test <- ts(log_switzerland_data[61:71], start = 2011, frequency = 1)
+
+length(log_switz_train)
+length(log_switz_test)
 ```
 As seen, the time series is not stationary, so we need to difference the series:
 
@@ -2186,6 +2209,7 @@ romania_data <- chosen_countries %>%
   select(year, number_deaths) %>% 
   arrange(year) 
 
+length(romania_data$number_deaths)
 
 romania_ts <- ts(romania_data$number_deaths, start = 1959, frequency = 1)
 plot_ts(romania_ts) +   
@@ -2205,10 +2229,12 @@ plot_ts(romania_ts) +
 This data is a bit different from the rest, as it do not present a monotone decaying trend. Let's try to convert the series into a stationary series.
 
 ```{r}
-romania_train <- ts(romania_ts[0:50], start = 1959, frequency = 1)
-romania_test <- ts(romania_ts[50:60], start = 2009, frequency = 1)
+romania_train <- ts(romania_ts[1:50], start = 1959, frequency = 1)
+romania_test <- ts(romania_ts[51:60], start = 2009, frequency = 1)
 
-
+romania_test
+length(romania_train)
+length(romania_test)
 ```
 
 ```{r}
@@ -2355,6 +2381,8 @@ latvia_data <-chosen_countries %>%
   select(year, number_deaths) %>% 
   arrange(year) 
 
+length(latvia_data$number_deaths)
+
 latvia_ts <- ts(latvia_data$number_deaths, start = 1980, frequency = 1)
 plot_ts(latvia_ts) +   
   theme_minimal() +
@@ -2370,8 +2398,11 @@ plot_ts(latvia_ts) +
   )
 ```
 ```{r}
-latvia_train <- ts(latvia_ts[0:30], start = 1980, frequency = 1)
-latvia_test <- ts(latvia_ts[30:41], start = 2011, frequency = 1)
+latvia_train <- ts(latvia_ts[1:31], start = 1980, frequency = 1)
+latvia_test <- ts(latvia_ts[32:42], start = 2011, frequency = 1)
+latvia_train
+length(latvia_train)
+length(latvia_test)
 
 ```
 
@@ -2494,6 +2525,7 @@ We begin by studying Spain. First, we need to check if the exogenous variables a
 
 ```{r}
 spain_data
+
 length(spain_data$number_deaths)
 length(spain_data$population)
 length(na.omit(spain_data$gdp_capita))
@@ -2504,15 +2536,44 @@ Notice that the population regressor has the same length as the original series,
 
 We can shorten the number of deaths time series, in order to get the same length in both series.
 
+#### ARIMAX with two regressors
+
+```{r}
+log_spain_short <- ts(log_spain_data[10:71], start  = 1960, frequency = 1)
+log_spain_short_train <- ts(log_spain_short[0:51], start = 1960, frequency = 1)
+log_spain_short_test <- ts(log_spain_short[51:62], start = 2010, frequency = 1)
+log_gdp_spain <- ts(log(spain_data$gdp_capita)[10:71], start = 1960, frequency = 1)
+
+
+log_gdp_spain_train <- ts(log_gdp_spain[0:51], start = 1960, frequency = 1)
+log_gdp_spain_test <- ts(log_gdp_spain[51:62], start = 2010, frequency = 1)
+```
+
 ```{r}
 
-log_population_spain <- ts(log(spain_data$population), start = 1951, frequency = 1)
-log_population_spain_train <- ts(log_population_spain[0:60], start = 1951, frequency = 1)
-log_population_spain_test <- ts(log_population_spain[61:71], start = 2011, frequency = 1)
+log_population_spain <- ts(log(spain_data$population)[10:71], start = 1960, frequency = 1)
+log_population_spain_train <- ts(log_population_spain[0:51], start = 1960, frequency = 1)
+log_population_spain_test <- ts(log_population_spain[51:62], start = 2010, frequency = 1)
 
-fit_arimax_spain <- auto.arima(log_spain_data_train, xreg = log_population_spain_train)
+xreg = data.frame(
+  pop = as.numeric(log_population_spain_train),
+  gdp = as.numeric(log_gdp_spain_train)
+)
 
-fs <- forecast(fit_arimax_spain, xreg = log_population_spain_test, h= horizon_spain)
+xreg_test = data.frame(
+  pop = as.numeric(log_population_spain_test),
+  gdp = as.numeric(log_gdp_spain_test)
+)
+
+fit_arimax_spain <- auto.arima(log_spain_short_train, xreg = as.matrix(xreg))
+fit_arimax_spain
+
+
+fit_arimax_spain_2 <- Arima(log_spain_data_train, order = c(0,2,1), xreg = log_population_spain_train)
+fs_2 <- forecast(fit_arimax_spain_2, xreg = log_population_spain_test, h = horizon_spain)
+
+fs <- forecast(fit_arimax_spain, xreg = as.matrix(xreg_test), h= horizon_spain)
+autoplot(fs)
 fs_exp <- exp(fs$mean)
 ```
 
