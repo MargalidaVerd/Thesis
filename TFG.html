@@ -322,7 +322,7 @@ $ gdp_capita                        &lt;dbl&gt; 674.7934, 717.3800, 1009.9771, 5
 </div>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb14"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb14-1"><a href="#cb14-1" aria-hidden="true" tabindex="-1"></a>full_dataset <span class="sc">%&gt;%</span></span>
-<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(subregion <span class="sc">==</span> <span class="st">"E"</span>) <span class="sc">%&gt;%</span> </span>
+<span id="cb14-2"><a href="#cb14-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">filter</span>(subregion <span class="sc">==</span> <span class="st">"C"</span>) <span class="sc">%&gt;%</span> </span>
 <span id="cb14-3"><a href="#cb14-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">group_by</span>(country_name) <span class="sc">%&gt;%</span></span>
 <span id="cb14-4"><a href="#cb14-4" aria-hidden="true" tabindex="-1"></a>  <span class="fu">summarise</span>(</span>
 <span id="cb14-5"><a href="#cb14-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">number_deaths =</span> <span class="fu">sum</span>(<span class="sc">!</span><span class="fu">is.na</span>(number_deaths)),</span>
@@ -333,11 +333,14 @@ $ gdp_capita                        &lt;dbl&gt; 674.7934, 717.3800, 1009.9771, 5
 <span id="cb14-10"><a href="#cb14-10" aria-hidden="true" tabindex="-1"></a>  <span class="fu">data.frame</span>() </span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>  country_name number_deaths population gdp_capita
-1       Latvia            42         42         27
-2      Estonia            40         40         30
-3    Lithuania            40         40         28
-4      Ukraine            35         35         31
-5      Belarus            29         29         20</code></pre>
+1  Switzerland            71         71         62
+2      Hungary            68         68         55
+3      Austria            67         67         62
+4       Poland            61         61         30
+5   Luxembourg            56         56         56
+6      Czechia            36         36         32
+7      Germany            31         31         31
+8     Slovakia            28         28         28</code></pre>
 </div>
 </div>
 <p>Lets study each subregion:</p>
@@ -366,10 +369,11 @@ $ gdp_capita                        &lt;dbl&gt; 674.7934, 717.3800, 1009.9771, 5
 <p>The first step is to initialize this structure with the full dataset filtered by country and ordered by year:</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb16"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb16-1"><a href="#cb16-1" aria-hidden="true" tabindex="-1"></a>country_splits <span class="ot">&lt;-</span> <span class="fu">hashmap</span>()</span>
-<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>chosen_countries <span class="ot">=</span> <span class="fu">c</span>(<span class="st">"Spain"</span>, <span class="st">"Netherlands"</span>, <span class="st">"Sweden"</span>, <span class="st">"Switzerland"</span>, <span class="st">"Romania"</span>, <span class="st">"Latvia"</span>)</span>
-<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (name <span class="cf">in</span> chosen_countries) {</span>
-<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a>  country_splits[[name]][[<span class="st">"full"</span>]] <span class="ot">&lt;-</span> full_dataset <span class="sc">%&gt;%</span> <span class="fu">filter</span>(country_name <span class="sc">==</span> name) <span class="sc">%&gt;%</span>  <span class="fu">arrange</span>(year)</span>
-<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb16-2"><a href="#cb16-2" aria-hidden="true" tabindex="-1"></a>chosen_countries <span class="ot">=</span> <span class="fu">c</span>(<span class="st">"Spain"</span>, <span class="st">"Netherlands"</span>, <span class="st">"Sweden"</span>, <span class="st">"Switzerland"</span>, <span class="st">"Bulgaria"</span>, <span class="st">"Estonia"</span>)</span>
+<span id="cb16-3"><a href="#cb16-3" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb16-4"><a href="#cb16-4" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span> (name <span class="cf">in</span> chosen_countries) {</span>
+<span id="cb16-5"><a href="#cb16-5" aria-hidden="true" tabindex="-1"></a>  country_splits[[name]][[<span class="st">"full"</span>]] <span class="ot">&lt;-</span> full_dataset <span class="sc">%&gt;%</span> <span class="fu">filter</span>(country_name <span class="sc">==</span> name) <span class="sc">%&gt;%</span>  <span class="fu">arrange</span>(year)</span>
+<span id="cb16-6"><a href="#cb16-6" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Next, we define the specific number of years to allocate to the testing set for each country. These values were chosen based on the total number of available observations, ensuring approximately 15–20% of the series is reserved for out-of-sample evaluation.</p>
 <div class="cell">
@@ -378,9 +382,9 @@ $ gdp_capita                        &lt;dbl&gt; 674.7934, 717.3800, 1009.9771, 5
 <span id="cb17-3"><a href="#cb17-3" aria-hidden="true" tabindex="-1"></a>test_lengths_per_country[[<span class="st">"Spain"</span>]] <span class="ot">=</span> <span class="dv">11</span></span>
 <span id="cb17-4"><a href="#cb17-4" aria-hidden="true" tabindex="-1"></a>test_lengths_per_country[[<span class="st">"Switzerland"</span>]] <span class="ot">=</span> <span class="dv">11</span></span>
 <span id="cb17-5"><a href="#cb17-5" aria-hidden="true" tabindex="-1"></a>test_lengths_per_country[[<span class="st">"Sweden"</span>]] <span class="ot">=</span> <span class="dv">11</span></span>
-<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>test_lengths_per_country[[<span class="st">"Latvia"</span>]] <span class="ot">=</span> <span class="dv">11</span></span>
+<span id="cb17-6"><a href="#cb17-6" aria-hidden="true" tabindex="-1"></a>test_lengths_per_country[[<span class="st">"Estonia"</span>]] <span class="ot">=</span> <span class="dv">11</span></span>
 <span id="cb17-7"><a href="#cb17-7" aria-hidden="true" tabindex="-1"></a>test_lengths_per_country[[<span class="st">"Netherlands"</span>]] <span class="ot">=</span> <span class="dv">12</span></span>
-<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>test_lengths_per_country[[<span class="st">"Romania"</span>]] <span class="ot">=</span> <span class="dv">10</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb17-8"><a href="#cb17-8" aria-hidden="true" tabindex="-1"></a>test_lengths_per_country[[<span class="st">"Bulgaria"</span>]] <span class="ot">=</span> <span class="dv">10</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Finally, we split the dataset for each country into a training and a testing subset based on the predefined test lengths. This setup is essential for subsequent model fitting and forecast evaluation.</p>
 <div class="cell">
@@ -657,16 +661,16 @@ W = 0.88402, p-value = 3.614e-05</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>     Point Forecast    Lo 95    Hi 95
 2011       5.971262 5.715572 6.144812
-2012       5.971262 5.607353 6.192232
-2013       5.971262 5.568554 6.244105
-2014       5.971262 5.535746 6.286711
-2015       5.971262 5.498785 6.321388
-2016       5.971262 5.462480 6.365857
-2017       5.971262 5.419423 6.392885
-2018       5.971262 5.386113 6.437647
-2019       5.971262 5.349732 6.461049
-2020       5.971262 5.328874 6.500957
-2021       5.971262 5.287891 6.526952</code></pre>
+2012       5.971262 5.574513 6.195961
+2013       5.971262 5.542679 6.248741
+2014       5.971262 5.496438 6.300178
+2015       5.971262 5.465450 6.331402
+2016       5.971262 5.442164 6.367508
+2017       5.971262 5.375082 6.399018
+2018       5.971262 5.351576 6.431541
+2019       5.971262 5.328955 6.460990
+2020       5.971262 5.290279 6.496572
+2021       5.971262 5.294164 6.519892</code></pre>
 </div>
 </div>
 <div class="cell">
@@ -821,6 +825,685 @@ W = 0.94445, p-value = 0.008611</code></pre>
 <p>Although ARIMA(<span class="math inline">\(0,2,1\)</span>) achieved the lowest numerical errors, its fitted trajectory clearly overestimates the true decline in TB deaths (see the plot). However, because the forecast curve from ARIMA(<span class="math inline">\(0,2,1\)</span>) decays too gradually and remains well above the actual values after 2015, it fails to capture the accelerated drop in mortality.</p>
 <p>In light of this discrepancy between numerical error metrics and visual fit, ARIMA(<span class="math inline">\(0,2,1\)</span>) does not adequately reproduce the sharp downturn observed in the test period. Therefore, despite its lower AIC and error measures, ARIMA(<span class="math inline">\(0,2,1\)</span>) is not optimal.</p>
 </section>
+<section id="the-netherlands" class="level3">
+<h3 class="anchored" data-anchor-id="the-netherlands">The Netherlands</h3>
+<p>We study the Netherlands.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-44-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>ACF and PACF fo the log-transformed series.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-45-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-45-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>ADF test to study stationarity.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Augmented Dickey-Fuller Test
+
+data:  train_netherlands
+Dickey-Fuller = -3.0904, Lag order = 3, p-value = 0.1338
+alternative hypothesis: stationary</code></pre>
+</div>
+</div>
+<p>The training series is not stationary.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-47-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-47-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>After apply a first order difference, the series ACF plot shows a significant spike at lag 4, and the PACF plot shows significant spikes at lags 4 and 7. We will begin studying the simplest model and the autogenerate model of auto.arima().</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_netherlands 
+ARIMA(0,1,0) with drift 
+
+Coefficients:
+        drift
+      -0.0595
+s.e.   0.0205
+
+sigma^2 = 0.02575:  log likelihood = 25.15
+AIC=-46.3   AICc=-46.09   BIC=-42.11
+
+Training set error measures:
+                       ME      RMSE       MAE        MPE     MAPE      MASE
+Training set 0.0001249287 0.1578122 0.1169041 0.04802681 2.309951 0.8611639
+                    ACF1
+Training set -0.07012464</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-49-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(0,1,0) with drift
+Q* = 18.316, df = 10, p-value = 0.04986
+
+Model df: 0.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_netherlands_auto)
+W = 0.95154, p-value = 0.01708</code></pre>
+</div>
+</div>
+<p>The residuals for the autogenerate model do not satisfy the hypothesis.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_ts 
+ARIMA(4,1,3) 
+
+Coefficients:
+          ar1     ar2     ar3     ar4     ma1      ma2      ma3
+      -0.4994  0.4882  0.5442  0.4068  0.5169  -0.7366  -0.2768
+s.e.   0.5101  0.1413  0.3266  0.1840  0.5824   0.1294   0.4322
+
+sigma^2 = 0.02285:  log likelihood = 30.84
+AIC=-45.68   AICc=-42.85   BIC=-28.92</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-51-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(4,1,3)
+Q* = 4.8952, df = 3, p-value = 0.1796
+
+Model df: 7.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_netherlands_413)
+W = 0.98246, p-value = 0.5298</code></pre>
+</div>
+</div>
+<p>On the contrary, the residuals of the 4,1,3 model pass both normality and Ljung-Box test.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2011       3.929448 3.647110 4.281337
+2012       3.869913 3.481879 4.378548
+2013       3.810377 3.333824 4.431376
+2014       3.750842 3.190723 4.430539
+2015       3.691306 3.058758 4.437174
+2016       3.631770 2.925802 4.482767
+2017       3.572235 2.803913 4.455371
+2018       3.512699 2.695971 4.431522
+2019       3.453163 2.589038 4.418984
+2020       3.393628 2.478667 4.380006
+2021       3.334092 2.366982 4.398560
+2022       3.274557 2.271449 4.409471</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>   Point Forecast    Lo 95    Hi 95
+62       3.906947 3.610425 4.203468
+63       3.914559 3.491867 4.337252
+64       3.867523 3.388461 4.346585
+65       3.793889 3.203506 4.384273
+66       3.778466 3.080918 4.476014
+67       3.727717 2.934640 4.520794
+68       3.686326 2.788148 4.584505
+69       3.643872 2.632273 4.655472
+70       3.610974 2.491659 4.730288
+71       3.563507 2.329256 4.797758
+72       3.531208 2.180713 4.881703
+73       3.488989 2.019439 4.958540</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-53-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-53-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-54-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-55-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We have seen that these models do not fit well the testing data. However, the ARIMA(4,1,3) seems to have cached some of the trend of the series. We propose to study a higher model, based on the ACF and PACF: an ARIMA(7,1,3).</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_ts 
+ARIMA(7,1,3) 
+
+Coefficients:
+         ar1      ar2     ar3      ar4     ar5      ar6     ar7      ma1
+      0.1157  -0.7316  0.9497  -0.1901  0.5342  -0.0956  0.3425  -0.0946
+s.e.  0.1651   0.1422  0.1712   0.1882  0.1546   0.1432  0.1303   0.1483
+         ma2      ma3
+      0.5847  -0.6934
+s.e.  0.1223   0.1473
+
+sigma^2 = 0.01996:  log likelihood = 34.45
+AIC=-46.91   AICc=-41.41   BIC=-23.87</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   Point Forecast    Lo 95    Hi 95
+62       3.894147 3.613012 4.175282
+63       3.928830 3.528950 4.328710
+64       3.849912 3.385115 4.314708
+65       3.744362 3.187404 4.301320
+66       3.728808 3.096481 4.361134
+67       3.752113 3.028511 4.475715
+68       3.661229 2.827708 4.494750
+69       3.561006 2.621835 4.500176
+70       3.604020 2.547534 4.660507
+71       3.566323 2.398441 4.734205
+72       3.430378 2.151572 4.709184
+73       3.446027 2.040223 4.851831</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-58-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-59-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Final conclusions</strong></p>
+<p>Let’s do a summary of the Netherlands models applied; we are going to change the scale into the original one.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>         Model         ME     RMSE       MPE       MAE     MAPE
+1 ARIMA(0,1,0)  -8.534281  9.64701 -32.44534  8.905319 33.60484
+2 ARIMA(4,1,3) -12.316992 12.94797 -47.98934 12.316992 47.98934
+3 ARIMA(7,1,3) -11.248034 12.05603 -43.72985 11.248034 43.72985</code></pre>
+</div>
+</div>
+<p>Among the three ARIMA specifications, the simplest model—ARIMA(0,1,0)—actually yields the lowest forecast errors on the original scale. It has an RMSE of 9.65 and an MAE of 8.91, with a MAPE of 33.60%, indicating that its predictions are off by roughly one‐third on average. In contrast, ARIMA(4,1,3) shows considerably higher error (RMSE = 12.95, MAE = 12.32, MAPE = 47.99%) and a larger overprediction bias (ME = –12.32, MPE = –47.99%), while ARIMA(7,1,3) falls between the two (RMSE = 12.06, MAE = 11.25, MAPE = 43.73%). Thus, despite its simplicity, ARIMA(0,1,0) best balances bias and precision for forecasting TB deaths in the Netherlands.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-62-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>However, despite its lower numerical error metrics, the ARIMA(0,1,0) curve (purple dashed line) clearly fails to follow the actual year‐to‐year fluctuations in TB deaths. It smooths the decline too uniformly, missing the mid‐series uptick around test year 10 and exaggerating death counts early on. In contrast, both ARIMA(4,1,3) (red) and ARIMA(7,1,3) (green) better capture the changing slope and occasional rebounds, demonstrating that a slightly more complex ARIMA structure more faithfully reproduces the true dynamics.</p>
+</section>
+<section id="bulgaria" class="level3">
+<h3 class="anchored" data-anchor-id="bulgaria">Bulgaria</h3>
+<p>Now, we study Bulgaria data. As seen in the introduction, Bulgaria has a different trend for number_deaths series.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-63-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We will work with the logarithmic data. We check both ACF and PACF plots:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-64-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-64-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF shows an exponential decay, while the PACF shows a single significant spike at lag 1. This suggest an AR(<span class="math inline">\(1\)</span>) process. However, the series is not stationary (as seen in the plot, and justified by the ADF test, with a <span class="math inline">\(p\)</span>-value of 0.05173).</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Augmented Dickey-Fuller Test
+
+data:  train_bulgaria
+Dickey-Fuller = -2.1424, Lag order = 3, p-value = 0.5173
+alternative hypothesis: stationary</code></pre>
+</div>
+</div>
+<p>Let’s see which ARIMA order proposes the auto.arima() function.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_bulgaria 
+ARIMA(0,1,0) with drift 
+
+Coefficients:
+        drift
+      -0.0409
+s.e.   0.0147
+
+sigma^2 = 0.01038:  log likelihood = 41.16
+AIC=-78.32   AICc=-78.05   BIC=-74.62
+
+Training set error measures:
+                       ME       RMSE        MAE         MPE    MAPE      MASE
+Training set 0.0001478023 0.09973848 0.07737386 0.001195524 1.32575 0.8967336
+                   ACF1
+Training set 0.07537416</code></pre>
+</div>
+</div>
+<p>The model proposed is an ARIMA(0,1,0) with drift. We need to further study the residuals of the model.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-67-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(0,1,0) with drift
+Q* = 5.4184, df = 10, p-value = 0.8615
+
+Model df: 0.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_bulgaria_auto)
+W = 0.98861, p-value = 0.9188</code></pre>
+</div>
+</div>
+<p>The residuals seem to pass both Ljung-Box test and Shapiro-Wilk normality test. Now, we can forecast.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2012       5.088969 4.889281 5.288657
+2013       5.048040 4.765638 5.330442
+2014       5.007110 4.661240 5.352980
+2015       4.966181 4.566804 5.365557
+2016       4.925251 4.478735 5.371768
+2017       4.884322 4.395187 5.373456
+2018       4.843392 4.315067 5.371718
+2019       4.802463 4.237659 5.367266
+2020       4.761533 4.162468 5.360598
+2021       4.720604 4.089134 5.352073</code></pre>
+</div>
+</div>
+<p>We can plot the results:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-69-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-69-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s check the error measures of the test data:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>         Model         ME      RMSE       MPE      MAE    MAPE
+1 ARIMA(0,1,0) -0.2612071 0.3328491 -5.963978 0.269393 6.12355</code></pre>
+</div>
+</div>
+<p>The ARIMA(<span class="math inline">\(0,1,0\)</span>) model yields a modest overprediction bias (ME = <span class="math inline">\(–0.26\)</span>) and low forecast error (RMSE = <span class="math inline">\(0.33\)</span>, MAE = <span class="math inline">\(0.27\)</span>) on the log‐scale. Its MPE of <span class="math inline">\(–5.96\)</span>% and MAPE of <span class="math inline">\(6.12\)</span>% indicate that, on average, predictions are about 6% higher than actual values, reflecting a relatively accurate fit.</p>
+<p>Finally, we can plot the predicted values versus the real values, on the logarithmic scale.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-71-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ARIMA(0,1,0) model does capture the overall downward trend, but as the plot shows, its forecasts remain too flat and consistently overestimate actual values. To improve accuracy, we will explore an AR(1) structure: the ACF/PACF of the series both suggest a significant lag‐1 dependence, so fitting ARIMA(1,1,0) may better track the curvature in the decline.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_bulgaria 
+ARIMA(1,1,0) 
+
+Coefficients:
+         ar1
+      0.1998
+s.e.  0.1448
+
+sigma^2 = 0.01161:  log likelihood = 38.51
+AIC=-73.01   AICc=-72.74   BIC=-69.31
+
+Training set error measures:
+                      ME     RMSE        MAE        MPE    MAPE      MASE
+Training set -0.03256068 0.105491 0.08052408 -0.5535922 1.37339 0.9332435
+                   ACF1
+Training set -0.1126777</code></pre>
+</div>
+</div>
+<p>The AIC has a value of <span class="math inline">\(-73.01\)</span>, meaning it could be a good fit. We check the residuals:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-73-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(1,1,0)
+Q* = 4.9885, df = 9, p-value = 0.8353
+
+Model df: 1.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_bulgaria_110)
+W = 0.97825, p-value = 0.508</code></pre>
+</div>
+</div>
+<p>The residuals seem to pass both Ljung-Box test and Shapiro-Wilk normality test. Now, we can forecast.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2012       5.098251 4.887045 5.309456
+2013       5.091926 4.762039 5.421813
+2014       5.090663 4.669487 5.511838
+2015       5.090410 4.593582 5.587238
+2016       5.090359 4.527807 5.652912
+2017       5.090349 4.468958 5.711741
+2018       5.090347 4.415220 5.765475
+2019       5.090347 4.365455 5.815239
+2020       5.090347 4.318894 5.861799
+2021       5.090347 4.274988 5.905706</code></pre>
+</div>
+</div>
+<p>We can plot the results:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-75-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-75-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s check the error measures of the logarithmic test data:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>         Model         ME      RMSE       MPE       MAE     MAPE
+1 ARIMA(1,1,0) -0.4477553 0.5461903 -8.334346 0.4540849 10.28914</code></pre>
+</div>
+</div>
+<p>The ARIMA(<span class="math inline">\(1,1,0\)</span>) fit still shows a slight overprediction bias (ME = –0.45) but achieves a lower RMSE (0.55) and MAE (0.45) than the (0,1,0) model. Its MPE of –8.33% and MAPE of 10.29% indicate that forecasts now overshoot actual log‐deaths by about 8%, yielding around a 10% average percentage error—an improvement over the simpler differenced‐white‐noise model.</p>
+<p>Finally, we can plot the predicted values versus the real values, on the logarithmic scale.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-77-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Even with the ARIMA(<span class="math inline">\(1,1,0\)</span>) specification, the model still fails to track the path of actual values. To address this, we will employ our <code>try_all_arima</code> routine to explore higher‐order combinations of <span class="math inline">\(p\)</span>, <span class="math inline">\(d\)</span>, and <span class="math inline">\(q\)</span> and identify a more flexible ARIMA structure.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>ARIMA(2,0,2)
+       ar1        ar2        ma1        ma2  intercept 
+0.01967033 0.95871774 1.17523038 0.17526412 6.05611253 
+AIC: -62.67135 
+
+ARIMA(2,0,3)
+        ar1         ar2         ma1         ma2         ma3   intercept 
+ 1.85906303 -0.86791111 -0.76224260 -0.04799433  0.17991758  5.90828133 
+AIC: -66.11269 
+
+ARIMA(2,1,2)
+       ar1        ar2        ma1        ma2 
+ 0.3218593  0.5568116 -0.1526562 -0.5075838 
+AIC: -70.36894 
+
+ARIMA(2,1,3)
+       ar1        ar2        ma1        ma2        ma3 
+ 1.2085902 -0.6076059 -1.1585947  0.5923453  0.2828021 
+AIC: -71.22836 
+
+ARIMA(3,0,2)
+       ar1        ar2        ar3        ma1        ma2  intercept 
+ 0.9646081  0.9198317 -0.8957284  0.1968321 -0.8026005  5.9366464 
+AIC: -64.9177 
+
+ARIMA(3,0,3)
+        ar1         ar2         ar3         ma1         ma2         ma3 
+ 1.77400388 -0.70159466 -0.08196276 -0.68199975 -0.12049021  0.18801855 
+  intercept 
+ 5.90684280 
+AIC: -64.13143 
+
+ARIMA(3,1,2)
+       ar1        ar2        ar3        ma1        ma2 
+ 1.1915321 -0.7999759  0.2938263 -1.0832134  0.7228235 
+AIC: -71.15588 
+
+ARIMA(3,1,3)
+       ar1        ar2        ar3        ma1        ma2        ma3 
+ 1.1201856 -0.4790418 -0.0739804 -1.0732044  0.4644606  0.3708512 
+AIC: -69.24622 </code></pre>
+</div>
+</div>
+<p>The best model, based on the AIC criterion is an ARIMA(<span class="math inline">\(2,1,3\)</span>). Let’s fit this model:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_ts 
+ARIMA(2,1,3) 
+
+Coefficients:
+         ar1      ar2      ma1     ma2     ma3
+      1.2086  -0.6076  -1.1586  0.5923  0.2828
+s.e.  0.2052   0.1853   0.2572  0.3264  0.2154
+
+sigma^2 = 0.01026:  log likelihood = 41.61
+AIC=-71.23   AICc=-69.13   BIC=-60.13
+
+Training set error measures:
+                      ME       RMSE        MAE        MPE     MAPE      MASE
+Training set -0.02423668 0.09475054 0.07328461 -0.4121023 1.252595 0.8493408
+                    ACF1
+Training set -0.06150391</code></pre>
+</div>
+</div>
+<p>Let’s check the residuals:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-80-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(2,1,3)
+Q* = 2.8661, df = 5, p-value = 0.7206
+
+Model df: 5.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_bulgaria_213)
+W = 0.98473, p-value = 0.7801</code></pre>
+</div>
+</div>
+<p>The residuals pass both Ljung-Box and normality test. Now, we can forecast:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   Point Forecast    Lo 95    Hi 95
+49       5.036901 4.834713 5.239089
+50       4.969496 4.672582 5.266409
+51       4.915663 4.542007 5.289319
+52       4.891557 4.422022 5.361092
+53       4.895132 4.310641 5.479624
+54       4.914100 4.211345 5.616855
+55       4.934852 4.125098 5.744606
+56       4.948408 4.049030 5.847785
+57       4.952182 3.979348 5.925015
+58       4.948507 3.913727 5.983286</code></pre>
+</div>
+</div>
+<p>We can plot the results:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-82-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s check the error measures of the test data:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>         Model         ME      RMSE       MPE       MAE     MAPE
+1 ARIMA(2,1,3) -0.2971004 0.4254534 -6.892946 0.3239278 7.419726</code></pre>
+</div>
+</div>
+<p>The ARIMA(<span class="math inline">\(2,1,3\)</span>) model shows a modest overprediction bias (ME = –0.30) and improved overall accuracy (RMSE = 0.43, MAE = 0.32) compared to lower‐order specifications. Its MPE of –6.89% and MAPE of 7.42% indicate that forecasts tend to overshoot by roughly 6.9%, with an average percentage error of about 7.4%, reflecting a noticeably tighter fit to the observed log‐deaths series.</p>
+<p>Finally, we can plot the predicted values versus the real values, on the logarithmic scale.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-84-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>Final conclusions</strong></p>
+<p>Let’s do a summary of the Bulgarian models applied; we are going to change the scale into the original one.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>         Model        ME     RMSE       MPE      MAE     MAPE
+1 ARIMA(0,1,0) -26.96843 32.08783 -32.80453 28.32392 33.60660
+2 ARIMA(1,1,0) -53.70719 62.47486 -64.71909 54.76014 65.34214
+3 ARIMA(2,1,3) -31.08017 43.21817 -41.48721 35.29090 44.06939</code></pre>
+</div>
+</div>
+<p>Among the three candidates, ARIMA(0,1,0) delivers the best out‐of‐sample performance, with the lowest RMSE (32.09), MAE (28.32), and MAPE (33.61%), despite a moderate overestimation bias (ME = –26.97, MPE = –32.80%). In contrast, ARIMA(1,1,0) exhibits much larger forecast errors (RMSE = 62.47, MAE = 54.76, MAPE = 65.34%), and ARIMA(2,1,3) sits in between (RMSE = 43.22, MAE = 35.29, MAPE = 44.07%). Thus, the simple differenced‐white‐noise model (0,1,0) most consistently tracks actual TB‐death counts on the original scale.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-87-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
 </section>
 <section id="arimax-models" class="level2">
 <h2 class="anchored" data-anchor-id="arimax-models">ARIMAX models</h2>
@@ -831,14 +1514,2699 @@ W = 0.94445, p-value = 0.008611</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-45-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-89-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
-<p>In stark contrast with the other countries, Spain population has a strong increasing trend, reaching nearly 50 million in 2010. Romania follows Spain as the second country with a bigger population; however, the difference between both countries is nearly 20 million. The Netherlands, Sweden and Switzerland present similar increasing trends. Finally, Latvia is the country with the lowest population. Moreover, it shows a slow decaying tendency from beyond the 1990. More information: WIKIPEDIA (Letonia perdió más de un 23% de su población por dos factores: la caída de su tasa de fertilidad, y un saldo migratorio negativo que se acentuó con la crisis económica de 2008.)</p>
+<p>In stark contrast with the other countries, Spain population has a strong increasing trend, climbing from around 28 million in 1950 to nearly 48 million by 2020. The Netherlands also grows steadily, from about 10 million to roughly 18 million. Sweden’s population increases more modestly, moving from approximately 7 million to just over 10 million, while Switzerland rises from about 5 million to nearly 9 million over the same period.</p>
+<p>In contrast, Bulgaria peaks near 9 million in the 1980s before gradually declining to about 7 million by 2020, and Estonia remains the smallest, hovering around 1.7 million in 1980 but falling slightly to around 1.3 million by 2020. The plot clearly highlights Spain’s large and sustained growth, moderate increases for Northern and Western European countries, and population declines in Eastern Europe.</p>
+<p>Now, let’s visualize the GDP per capita tendencies:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-90-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now, the outlook is quite different; Switzerland leads the list, climbing from around $2,000 in 1960 to over $90,000 by 2020, with sharp surges in the late 1990s and post-2005. Following Switzerland, the Netherlands and Sweden follow a similar upward trajectory. Spain increases more modestly, from under $1,000 to a peak of around $35,000 by 2008, then levels out in the $25,000–$30,000 range.Estonia lags until independence—remaining near zero through the Soviet era—then surges after 1992 from around $2,000 to approximately $25,000 by 2020. Bulgaria also starts below $1,000, grows gradually through the 1980s, dips in the 1990s, and then climbs to roughly $12,000 by 2020.</p>
+<p>Overall, Switzerland, Sweden, and the Netherlands display long-term, high-income growth; Spain shows moderate growth with a plateau post-2008; and the Eastern European countries (Estonia and Bulgaria) demonstrate rapid catch-up following post-1990 transitions.</p>
+<p>Before beginning the ARIMAX section, it is important to give special attention to the length of each of the variables, just to ensure that the studied variable (number_deaths) length coincides with the covariables length.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>      Country number_deaths_length population_length gdp_capita_length
+1       Spain                   71                71                62
+2 Netherlands                   73                73                63
+3      Sweden                   72                72                63
+4 Switzerland                   71                71                62
+5    Bulgaria                   58                58                42
+6     Estonia                   40                40                30</code></pre>
+</div>
+</div>
+<p>It is necessary that all variable have the same length; we create a function in order to automate this step.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb71"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>slice_country_data <span class="ot">&lt;-</span> <span class="cf">function</span>(country, start_year) {</span>
+<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a>  df_full <span class="ot">&lt;-</span> country_splits[[country]][[<span class="st">"full"</span>]]</span>
+<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a>  df_filtered <span class="ot">&lt;-</span> df_full <span class="sc">%&gt;%</span></span>
+<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(year <span class="sc">&gt;=</span> start_year) <span class="sc">%&gt;%</span></span>
+<span id="cb71-5"><a href="#cb71-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">arrange</span>(year)  </span>
+<span id="cb71-6"><a href="#cb71-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb71-7"><a href="#cb71-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(df_filtered)</span>
+<span id="cb71-8"><a href="#cb71-8" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Now, we need to divide these new series into a training and a testing set. We will do the split, ensuring that the 80% of the data is used for training.</p>
+<p>Now that we have prepared the dataset, we can begin the ARIMAX study.</p>
 <section id="spain-1" class="level3">
 <h3 class="anchored" data-anchor-id="spain-1">Spain</h3>
+<p>We begin studying Spain data. First, let’s plot all three variables (number_deaths, population and gdp_capita) in the same plot.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-96-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-96-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_spain_short 
+Regression with ARIMA(2,0,0) errors 
+
+Coefficients:
+         ar1     ar2  intercept  population  gdp_capita
+      0.6342  0.3226   107.2013     -5.6847     -0.0800
+s.e.  0.1383  0.1435    17.9677      1.0557      0.0835
+
+sigma^2 = 0.005923:  log likelihood = 58.76
+AIC=-105.51   AICc=-103.56   BIC=-94.04
+
+Training set error measures:
+                       ME       RMSE        MAE        MPE      MAPE      MASE
+Training set -0.008574922 0.07301075 0.05837411 -0.1222844 0.8471575 0.7428673
+                   ACF1
+Training set 0.04935634</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-98-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from Regression with ARIMA(2,0,0) errors
+Q* = 6.8514, df = 8, p-value = 0.5527
+
+Model df: 2.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arimax_spain)
+W = 0.99459, p-value = 0.9982</code></pre>
+</div>
+</div>
+<p>The residuals of the ARIMAX model satisfy both normality and non autocorrelation hypothesis. Now, we begin the forecast:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2010       5.903871 5.753032 6.054710
+2011       5.901433 5.722820 6.080047
+2012       5.903687 5.694274 6.113100
+2013       5.924341 5.692197 6.156486
+2014       5.941117 5.688823 6.193411
+2015       5.958216 5.688639 6.227794
+2016       5.951267 5.666390 6.236144
+2017       5.931419 5.632950 6.229887
+2018       5.899682 5.589021 6.210343
+2019       5.861994 5.540339 6.183649
+2020       5.841439 5.509821 6.173057
+2021       5.826246 5.485566 6.166926</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-100-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-100-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s plot the predicted versus the actual logarithmic values:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-101-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Finally, we can check the error measures in order to analyze the accuracy of the model.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>          Model         ME      RMSE       MPE      MAE     MAPE
+1 ARIMAX(2,0,0) -0.3571163 0.4043032 -6.572602 0.368348 6.760698</code></pre>
+</div>
+</div>
+<p>The ARIMAX(2,0,0) model exhibits a slight overestimation bias (ME = <span class="math inline">\(–0.36\)</span>) and moderate overall error (RMSE = <span class="math inline">\(0.40\)</span>, MAE = <span class="math inline">\(0.37\)</span>) on the log‐transformed series. Its MPE of <span class="math inline">\(–6.57\)</span>% and MAPE of <span class="math inline">\(6.76\)</span>% indicate that, on average, forecasts overshoot actual logarithmic values by around <span class="math inline">\(6.8\)</span>%, suggesting that while the exogenous variables help, there remains room for improvement in capturing the downward trajectory of TB deaths.</p>
+<p>In order to improve our ARIMAX model beyond what <code>auto.arima()</code> suggested, we will now inspect each differenced series manually (the response and both regressors) and choose orders <span class="math inline">\(p\)</span> and <span class="math inline">\(q\)</span> based on the ACF/PACF patterns, rather than relying on automatic selection. Recall that all three series (log(number_deaths), log(population) and log(gdp_capita)) are non‐stationary, so we first take first differences.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-103-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-103-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF plot shows a large, significant spike at lag 1, and then quickly dies off. In the same way, the PACF plot shows a significant spike at lag 1, with all higher partial autocorrelations inside the confidence bounds. These patterns suggest an ARIMA(<span class="math inline">\(p,1,q\)</span>) where one of <span class="math inline">\(p\)</span> or <span class="math inline">\(q\)</span> should be 1.</p>
+<p>Next, we difference the log⁡(population) series over the same short training period:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-104-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-104-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>TH ACF plot shows a slow exponential decay over the first few lags. In contrast, the PACF shows a single large spike at lag 1, and then subsequent lags are essentially within the confidence bounds. This pattern is characteristic of an AR(<span class="math inline">\(1\)</span>) process.</p>
+<p>Finally, we difference the log(gdp_capita) series:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-105-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-105-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF plot shows a large spike at lag 1 and smaller but non-negligible negative values at lags 3-7 and 9-11. On the other hand, the PACF also shows a strong negative spike at lag 5, and samller spikes between lags 6 and 15, but the dominant feature is the large positive spike at lag 1.</p>
+<p>This may suggest that the series may require both an AR(<span class="math inline">\(1\)</span>) and possibly an MA component to capture the very strong lag-1 autocorrelation.</p>
+<p>Putting all together, we propose the ARIMA(<span class="math inline">\(1,1,1\)</span>).</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_spain_short 
+Regression with ARIMA(1,1,1) errors 
+
+Coefficients:
+          ar1     ma1  population  gdp_capita
+      -0.6544  0.3382     -5.2355     -0.0582
+s.e.   0.3001  0.3618      1.1472      0.0816
+
+sigma^2 = 0.005949:  log likelihood = 58.94
+AIC=-107.89   AICc=-106.49   BIC=-98.43</code></pre>
+</div>
+</div>
+<p>The value of the AIC (<span class="math inline">\(-107.89\)</span>) indicates a well-suited fit. Now, we need to check the residuals:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-107-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from Regression with ARIMA(1,1,1) errors
+Q* = 4.5114, df = 8, p-value = 0.8083
+
+Model df: 2.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arimax_spain_111)
+W = 0.9887, p-value = 0.9111</code></pre>
+</div>
+</div>
+<p>The model’s residuals pass both normality and Ljung-Box tests. Now, we do the forecast.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2010       5.891290 5.740120 6.042460
+2011       5.914170 5.731043 6.097297
+2012       5.890541 5.663241 6.117842
+2013       5.924874 5.670510 6.179237
+2014       5.927755 5.643193 6.212316
+2015       5.947586 5.639220 6.255951
+2016       5.935229 5.602663 6.267794
+2017       5.919876 5.566055 6.273696
+2018       5.888337 5.513667 6.263008
+2019       5.853402 5.459482 6.247322
+2020       5.830907 5.418323 6.243491
+2021       5.818253 5.388010 6.248495</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-109-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-109-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s plot the predicted versus the actual logarithmic values:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-110-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Finally, we can check the error measures in order to analyze the accuracy of the model.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>          Model        ME      RMSE       MPE       MAE     MAPE
+1 ARIMAX(1,1,1) -0.348575 0.3964638 -6.418005 0.3619036 6.641217</code></pre>
+</div>
+</div>
+<p>The ARIMAX(<span class="math inline">\(1,1,1\)</span>) model yields a small overestimation bias (ME = <span class="math inline">\(–0.35\)</span>) and moderate error magnitude (RMSE = <span class="math inline">\(0.396\)</span>, MAE = <span class="math inline">\(0.362\)</span>) on the log‐transformed series. Its MPE of <span class="math inline">\(–6.42\)</span>% and MAPE of <span class="math inline">\(6.64\)</span>% indicate that forecasts tend to overshoot actual values by roughly <span class="math inline">\(6.6\)</span>%, reflecting improved but still imperfect tracking of the downward TB‐death trend.</p>
+<p><strong>Final conclusions</strong></p>
+<p>Let’s do a summary of the Spain models applied; we are going to change the scale into the original one.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>         Model        ME     RMSE       MPE      MAE     MAPE
+1 ARIMA(2,0,0) -104.6952 116.4516 -45.41260 108.9530 46.49876
+2 ARIMA(1,1,1) -101.5713 113.5724 -44.15437 106.5926 45.43533</code></pre>
+</div>
+</div>
+<p>The out‐of‐sample comparison on the original scale shows that ARIMA(<span class="math inline">\(1,1,1\)</span>) slightly outperforms ARIMA(<span class="math inline">\(2,0,0\)</span>). Although both models exhibit a modest overestimation bias (ME ≈ <span class="math inline">\(–105\)</span> for (2,0,0) versus <span class="math inline">\(–102\)</span> for (1,1,1)), ARIMA(<span class="math inline">\(1,1,1\)</span>) achieves a lower RMSE (<span class="math inline">\(113.57\)</span> vs.&nbsp;<span class="math inline">\(116.45\)</span>), a lower MAE (<span class="math inline">\(106.59\)</span> vs.&nbsp;<span class="math inline">\(108.95\)</span>), and a lower MAPE (<span class="math inline">\(45.44\)</span>% vs.&nbsp;<span class="math inline">\(46.50\)</span>%). In percentage terms, ARIMA(<span class="math inline">\(1,1,1\)</span>) also has a smaller average bias (<span class="math inline">\(–44.15\)</span>% vs.&nbsp;<span class="math inline">\(–45.41\)</span>%). Taken together, these results indicate that ARIMA(<span class="math inline">\(1,1,1\)</span>) provides a marginally better fit to the actual TB‐death trajectory than ARIMA(<span class="math inline">\(2,0,0\)</span>), making it the preferred model for forecasting.</p>
+<p>Finally, we plot both approaches for the test set.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-114-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="the-netherlands-1" class="level3">
+<h3 class="anchored" data-anchor-id="the-netherlands-1">The Netherlands</h3>
+<p>Let’s continue with the Netherlands.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-115-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-115-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   region_code region_name subregion country_code country_name year
+1           EU      Europe         W          NLD  Netherlands 1960
+2           EU      Europe         W          NLD  Netherlands 1961
+3           EU      Europe         W          NLD  Netherlands 1962
+4           EU      Europe         W          NLD  Netherlands 1963
+5           EU      Europe         W          NLD  Netherlands 1964
+6           EU      Europe         W          NLD  Netherlands 1965
+7           EU      Europe         W          NLD  Netherlands 1966
+8           EU      Europe         W          NLD  Netherlands 1967
+9           EU      Europe         W          NLD  Netherlands 1968
+10          EU      Europe         W          NLD  Netherlands 1969
+11          EU      Europe         W          NLD  Netherlands 1970
+12          EU      Europe         W          NLD  Netherlands 1971
+13          EU      Europe         W          NLD  Netherlands 1972
+14          EU      Europe         W          NLD  Netherlands 1973
+15          EU      Europe         W          NLD  Netherlands 1974
+16          EU      Europe         W          NLD  Netherlands 1975
+17          EU      Europe         W          NLD  Netherlands 1976
+18          EU      Europe         W          NLD  Netherlands 1977
+19          EU      Europe         W          NLD  Netherlands 1978
+20          EU      Europe         W          NLD  Netherlands 1979
+21          EU      Europe         W          NLD  Netherlands 1980
+22          EU      Europe         W          NLD  Netherlands 1981
+23          EU      Europe         W          NLD  Netherlands 1982
+24          EU      Europe         W          NLD  Netherlands 1983
+25          EU      Europe         W          NLD  Netherlands 1984
+26          EU      Europe         W          NLD  Netherlands 1985
+27          EU      Europe         W          NLD  Netherlands 1986
+28          EU      Europe         W          NLD  Netherlands 1987
+29          EU      Europe         W          NLD  Netherlands 1988
+30          EU      Europe         W          NLD  Netherlands 1989
+31          EU      Europe         W          NLD  Netherlands 1990
+32          EU      Europe         W          NLD  Netherlands 1991
+33          EU      Europe         W          NLD  Netherlands 1992
+34          EU      Europe         W          NLD  Netherlands 1993
+35          EU      Europe         W          NLD  Netherlands 1994
+36          EU      Europe         W          NLD  Netherlands 1995
+37          EU      Europe         W          NLD  Netherlands 1996
+38          EU      Europe         W          NLD  Netherlands 1997
+39          EU      Europe         W          NLD  Netherlands 1998
+40          EU      Europe         W          NLD  Netherlands 1999
+41          EU      Europe         W          NLD  Netherlands 2000
+42          EU      Europe         W          NLD  Netherlands 2001
+43          EU      Europe         W          NLD  Netherlands 2002
+44          EU      Europe         W          NLD  Netherlands 2003
+45          EU      Europe         W          NLD  Netherlands 2004
+46          EU      Europe         W          NLD  Netherlands 2005
+47          EU      Europe         W          NLD  Netherlands 2006
+48          EU      Europe         W          NLD  Netherlands 2007
+49          EU      Europe         W          NLD  Netherlands 2008
+50          EU      Europe         W          NLD  Netherlands 2009
+51          EU      Europe         W          NLD  Netherlands 2010
+   number_deaths percent_cause_specific_death_rate age_death_rate death_rate
+1            325                        0.37148801      2.7437928  2.8293838
+2            316                        0.35940539      2.6297084  2.7150799
+3            296                        0.31638128      2.4116499  2.5072634
+4            251                        0.26218480      1.9752148  2.0976099
+5            230                        0.24615516      1.7631420  1.8965631
+6            222                        0.22647053      1.6755866  1.8056561
+7            187                        0.18604003      1.3623827  1.5012484
+8            176                        0.17636684      1.2627974  1.3970250
+9            197                        0.18763871      1.4131242  1.5475620
+10           167                        0.15518283      1.1653621  1.2967852
+11           156                        0.14231110      1.0424142  1.1964567
+12           209                        0.18958120      1.3842304  1.5839933
+13           206                        0.18137635      1.3120618  1.5455487
+14           190                        0.17166296      1.2158470  1.4137641
+15           182                        0.16659039      1.1342663  1.3436593
+16           199                        0.17496505      1.1732114  1.4561473
+17           140                        0.12231988      0.8452214  1.0164077
+18           101                        0.09174062      0.5957890  0.7289156
+19           173                        0.15120395      0.9900729  1.2408817
+20           177                        0.15724248      0.9938939  1.2608364
+21           162                        0.14175833      0.8967193  1.1448925
+22           178                        0.15409254      0.9205673  1.2493683
+23           178                        0.15179424      0.9172912  1.2436507
+24           161                        0.13671759      0.8053623  1.1206159
+25           166                        0.13855040      0.8103940  1.1508437
+26           138                        0.11246577      0.6859192  0.9522692
+27           166                        0.13247464      0.7936857  1.1391554
+28           157                        0.12847896      0.7200449  1.0705689
+29           151                        0.12161433      0.6912587  1.0230283
+30           162                        0.12567395      0.7005508  1.0909973
+31           136                        0.10557039      0.5776036  0.9096077
+32           120                        0.09233752      0.5196465  0.7963051
+33           142                        0.10932580      0.5730137  0.9351888
+34           172                        0.12482311      0.7061930  1.1248888
+35           140                        0.10489170      0.5524166  0.9101074
+36           138                        0.10171365      0.5451569  0.8926839
+37           127                        0.09232268      0.4733110  0.8177457
+38           105                        0.07732927      0.4079446  0.6726199
+39           118                        0.08582942      0.4471409  0.7512478
+40           120                        0.08541716      0.4679117  0.7589125
+41            91                        0.06475624      0.3458279  0.5714102
+42            87                        0.06197596      0.3398740  0.5421851
+43            72                        0.05057778      0.2705021  0.4458500
+44            72                        0.05072709      0.2610800  0.4437513
+45            78                        0.05712068      0.2783823  0.4790631
+46            70                        0.05131890      0.2437266  0.4289213
+47            76                        0.05614160      0.2558262  0.4649387
+48            54                        0.04059479      0.1642595  0.3296362
+49            51                        0.03773976      0.1560307  0.3101135
+50            62                        0.04618766      0.2073890  0.3750668
+51            54                        0.03968896      0.1726799  0.3249998
+   population gdp_capita
+1    11486909   1154.687
+2    11639371   1252.577
+3    11807552   1340.396
+4    11969156   1434.776
+5    12131887   1665.879
+6    12301136   1845.382
+7    12464282   1983.351
+8    12607834   2151.413
+9    12740849   2360.885
+10   12890638   2642.956
+11   13052082   2927.073
+12   13208353   3378.615
+13   13342780   4104.451
+14   13453743   5345.575
+15   13559670   6440.978
+16   13680031   7335.509
+17   13786640   7925.688
+18   13868607   9166.808
+19   13953922  11179.390
+20   14050176  12798.543
+21   14162687  13791.862
+22   14262690  11520.448
+23   14333902  11072.658
+24   14396901  10680.359
+25   14462810   9977.160
+26   14538958   9926.130
+27   14626489  13783.850
+28   14724947  16709.560
+29   14825916  17744.501
+30   14921107  17397.692
+31   15030884  21290.860
+32   15155091  21732.231
+33   15276786  23904.037
+34   15389718  23122.411
+35   15485453  24646.314
+36   15565033  29258.134
+37   15640031  29006.809
+38   15723620  26700.537
+39   15827109  27885.808
+40   15940182  28272.643
+41   16058758  26214.499
+42   16182705  26896.548
+43   16288060  29343.245
+44   16366914  35750.975
+45   16425561  40436.618
+46   16465707  41994.714
+47   16493851  44900.938
+48   16531360  51799.209
+49   16597257  57879.944
+50   16684147  52722.213
+51   16771232  50999.745</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_netherlands_short 
+Regression with ARIMA(1,0,3) errors 
+
+Coefficients:
+         ar1     ma1      ma2     ma3  intercept  population  gdp_capita
+      0.7016  0.1219  -0.2952  0.3542   128.0135     -7.6703      0.3585
+s.e.  0.3116  0.3773   0.2773  0.1922    45.5845      2.9216      0.2839
+
+sigma^2 = 0.02116:  log likelihood = 28.85
+AIC=-41.71   AICc=-38.28   BIC=-26.25
+
+Training set error measures:
+                      ME      RMSE      MAE         MPE     MAPE      MASE
+Training set 0.001004353 0.1351224 0.100776 -0.07734668 2.081566 0.7912956
+                     ACF1
+Training set 0.0002817756</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-117-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from Regression with ARIMA(1,0,3) errors
+Q* = 2.1925, df = 6, p-value = 0.9012
+
+Model df: 4.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arimax_netherlands)
+W = 0.96887, p-value = 0.1985</code></pre>
+</div>
+</div>
+<p>The residuals of the ARIMAX model satisfy both normality and non autocorrelation hypothesis. Now, we begin the forecast:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   region_code region_name subregion country_code country_name year
+52          EU      Europe         W          NLD  Netherlands 2011
+53          EU      Europe         W          NLD  Netherlands 2012
+54          EU      Europe         W          NLD  Netherlands 2013
+55          EU      Europe         W          NLD  Netherlands 2014
+56          EU      Europe         W          NLD  Netherlands 2015
+57          EU      Europe         W          NLD  Netherlands 2016
+58          EU      Europe         W          NLD  Netherlands 2017
+59          EU      Europe         W          NLD  Netherlands 2018
+60          EU      Europe         W          NLD  Netherlands 2019
+61          EU      Europe         W          NLD  Netherlands 2020
+62          EU      Europe         W          NLD  Netherlands 2021
+63          EU      Europe         W          NLD  Netherlands 2022
+   number_deaths percent_cause_specific_death_rate age_death_rate death_rate
+52            36                        0.02652110     0.10705770 0.21565830
+53            34                        0.02414550     0.10146269 0.20292496
+54            38                        0.02690361     0.10500158 0.22613082
+55            34                        0.02442125     0.10493176 0.20160085
+56            36                        0.02446749     0.09108133 0.21251571
+57            29                        0.01946348     0.08098047 0.17028459
+58            23                        0.01531149     0.06388966 0.13423996
+59            28                        0.01825734     0.06764129 0.16169636
+60            20                        0.01316786     0.05504893 0.11453994
+61            32                        0.01897106     0.07848511 0.18273101
+62            20                        0.01169782     0.05300926 0.11403392
+63            17                        0.00999342     0.05317896 0.09607144
+   population gdp_capita
+52   16851061   54230.31
+53   16915191   50070.14
+54   16967065   52198.90
+55   17030087   52900.54
+56   17107427   45193.40
+57   17204694   46039.11
+58   17315375   48675.22
+59   17421284   53044.53
+60   17537506   52476.27
+61   17636732   52162.57
+62   17730564   58727.87
+63   17904422   57025.01</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2011       4.010795 3.725670 4.295920
+2012       4.057489 3.688117 4.426862
+2013       4.080473 3.702408 4.458538
+2014       4.099002 3.689422 4.508583
+2015       4.037390 3.613155 4.461626
+2016       4.021314 3.590047 4.452582
+2017       4.006658 3.571971 4.441345
+2018       4.000926 3.564565 4.437287
+2019       3.953235 3.516053 4.390418
+2020       3.912842 3.475256 4.350428
+2021       3.918174 3.480389 4.355959
+2022       3.835257 3.397374 4.273139</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-119-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-119-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s plot the predicted versus the actual logarithmic values:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-120-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Finally, we can check the error measures in order to analyze the accuracy of the model.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>          Model         ME      RMSE      MPE       MAE    MAPE
+1 ARIMAX(1,0,3) -0.6625668 0.6952391 -20.5302 0.6625668 20.5302</code></pre>
+</div>
+</div>
+<p>The ARIMAX(1,0,3) model yields an ME of –0.66 and an RMSE of 0.70 on the log‐scale, indicating a modest overprediction bias and moderate overall error. Its MPE of –20.53% and MAPE of 20.53% show that predicted values typically exceed actual deaths by around 20% on average, reflecting a reasonably accurate but slightly optimistic fit.</p>
+<p>Now, let’s try to adjust another ARIMAX model, just to try to improve the error measures. The auto.arima() function does not apply any difference to the series; let’s check the stationarity of the three series.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Augmented Dickey-Fuller Test
+
+data:  train_netherlands_short
+Dickey-Fuller = -1.6949, Lag order = 3, p-value = 0.697
+alternative hypothesis: stationary</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Augmented Dickey-Fuller Test
+
+data:  train_netherlands_short %&gt;% diff()
+Dickey-Fuller = -4.5461, Lag order = 3, p-value = 0.01
+alternative hypothesis: stationary</code></pre>
+</div>
+</div>
+<p>Yet the series is not stationary, when we apply a first order difference it passes the ADF test of stationarity. We an plot the ACf and PACF.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-123-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-123-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Both the ACF and PACF show a significant spike at lag 2.</p>
+<p>Now, we difference the other series.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Augmented Dickey-Fuller Test
+
+data:  xreg_netherlands_train$population %&gt;% diff(differences = 2)
+Dickey-Fuller = -4.1315, Lag order = 3, p-value = 0.01155
+alternative hypothesis: stationary</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Augmented Dickey-Fuller Test
+
+data:  xreg_netherlands_train$gdp_capita %&gt;% diff(differences = 2)
+Dickey-Fuller = -3.8721, Lag order = 3, p-value = 0.02247
+alternative hypothesis: stationary</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-124-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-124-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb94"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb94-1"><a href="#cb94-1" aria-hidden="true" tabindex="-1"></a>fit_arimax_netherlands_222 <span class="ot">&lt;-</span> <span class="fu">Arima</span>(train_netherlands_short, <span class="at">order =</span> <span class="fu">c</span>(<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">2</span>), <span class="at">xreg =</span> <span class="fu">as.matrix</span>(xreg_netherlands_train))</span>
+<span id="cb94-2"><a href="#cb94-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(fit_arimax_netherlands_222)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_netherlands_short 
+Regression with ARIMA(2,2,2) errors 
+
+Coefficients:
+          ar1      ar2      ma1      ma2  population  gdp_capita
+      -0.6994  -0.4729  -0.4380  -0.5620     -2.3486      0.2238
+s.e.   0.2433   0.1262   0.2959   0.2896      4.7852      0.1876
+
+sigma^2 = 0.02264:  log likelihood = 24
+AIC=-33.99   AICc=-31.26   BIC=-20.75
+
+Training set error measures:
+                      ME      RMSE       MAE         MPE     MAPE      MASE
+Training set 0.004383266 0.1381758 0.1041745 0.007764012 2.142461 0.8179813
+                    ACF1
+Training set -0.04055321</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-126-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from Regression with ARIMA(2,2,2) errors
+Q* = 2.9493, df = 6, p-value = 0.8152
+
+Model df: 4.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arimax_netherlands_222)
+W = 0.97846, p-value = 0.4757</code></pre>
+</div>
+</div>
+<p>The residuals of the ARIMAX model satisfy both normality and non autocorrelation hypothesis. Now, we begin the forecast:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2011       3.907612 3.609692 4.205532
+2012       3.918752 3.521450 4.316055
+2013       3.857227 3.430621 4.283833
+2014       3.801253 3.303651 4.298856
+2015       3.743783 3.189009 4.298558
+2016       3.689650 3.095132 4.284168
+2017       3.647143 3.002409 4.291877
+2018       3.624401 2.933713 4.315089
+2019       3.567756 2.836503 4.299009
+2020       3.516417 2.742187 4.290647
+2021       3.497614 2.682173 4.313056
+2022       3.431644 2.576982 4.286306</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-128-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-128-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s plot the predicted versus the actual logarithmic values:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-129-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Finally, we can check the error measures in order to analyze the accuracy of the model.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>          Model         ME      RMSE      MPE       MAE    MAPE
+1 ARIMAX(2,2,2) -0.3517083 0.3872296 -10.9641 0.3517083 10.9641</code></pre>
+</div>
+</div>
+<p><strong>Final conclusions</strong></p>
+<p>Let’s do a summary of the Netherlands models applied; we are going to change the scale into the original one.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>         Model        ME     RMSE       MPE      MAE     MAPE
+1 ARIMA(1,0,3) -25.52465 25.95641 -98.42814 25.52465 98.42814
+2 ARIMA(2,2,2) -11.36907 12.08252 -44.01532 11.36907 44.01532</code></pre>
+</div>
+</div>
+<p>Finally, we plot both approaches for the test set.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-133-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="bulgaria-1" class="level3">
+<h3 class="anchored" data-anchor-id="bulgaria-1">Bulgaria</h3>
+<p>Now, we study the Bulgarian time series. We begin, as in Spain, by studying the regressor variables.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-134-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-134-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   region_code region_name subregion country_code country_name year
+1           EU      Europe         B          BGR     Bulgaria 1980
+2           EU      Europe         B          BGR     Bulgaria 1981
+3           EU      Europe         B          BGR     Bulgaria 1982
+4           EU      Europe         B          BGR     Bulgaria 1983
+5           EU      Europe         B          BGR     Bulgaria 1984
+6           EU      Europe         B          BGR     Bulgaria 1985
+7           EU      Europe         B          BGR     Bulgaria 1986
+8           EU      Europe         B          BGR     Bulgaria 1987
+9           EU      Europe         B          BGR     Bulgaria 1988
+10          EU      Europe         B          BGR     Bulgaria 1989
+11          EU      Europe         B          BGR     Bulgaria 1990
+12          EU      Europe         B          BGR     Bulgaria 1991
+13          EU      Europe         B          BGR     Bulgaria 1992
+14          EU      Europe         B          BGR     Bulgaria 1993
+15          EU      Europe         B          BGR     Bulgaria 1994
+16          EU      Europe         B          BGR     Bulgaria 1995
+17          EU      Europe         B          BGR     Bulgaria 1996
+18          EU      Europe         B          BGR     Bulgaria 1997
+19          EU      Europe         B          BGR     Bulgaria 1998
+20          EU      Europe         B          BGR     Bulgaria 1999
+21          EU      Europe         B          BGR     Bulgaria 2000
+22          EU      Europe         B          BGR     Bulgaria 2001
+23          EU      Europe         B          BGR     Bulgaria 2002
+24          EU      Europe         B          BGR     Bulgaria 2003
+25          EU      Europe         B          BGR     Bulgaria 2004
+26          EU      Europe         B          BGR     Bulgaria 2005
+27          EU      Europe         B          BGR     Bulgaria 2006
+28          EU      Europe         B          BGR     Bulgaria 2007
+29          EU      Europe         B          BGR     Bulgaria 2008
+30          EU      Europe         B          BGR     Bulgaria 2009
+31          EU      Europe         B          BGR     Bulgaria 2010
+32          EU      Europe         B          BGR     Bulgaria 2011
+33          EU      Europe         B          BGR     Bulgaria 2012
+34          EU      Europe         B          BGR     Bulgaria 2013
+   number_deaths percent_cause_specific_death_rate age_death_rate death_rate
+1            349                         0.3563042       3.015428   3.938385
+2            332                         0.3478589       2.836083   3.734071
+3            339                         0.3380096       2.924209   3.801514
+4            344                         0.3366542       2.944172   3.847961
+5            314                         0.3096067       2.664097   3.504191
+6            260                         0.2418942       2.090483   2.902142
+7            249                         0.2393333       2.051553   2.779762
+8            233                         0.2173244       1.944651   2.597142
+9            255                         0.2374633       2.109092   2.839201
+10           240                         0.2245047       2.013402   2.669781
+11           209                         0.1924352       1.716632   2.324598
+12           224                         0.2028563       1.797896   2.493877
+13           269                         0.2490787       2.252225   3.149809
+14           286                         0.2610918       2.390466   3.375707
+15           325                         0.2907315       2.787220   3.849069
+16           332                         0.2895265       2.763979   3.949513
+17           342                         0.2921679       2.881420   4.089539
+18           387                         0.3175749       3.378461   4.655919
+19           395                         0.3342076       3.483218   4.783936
+20           307                         0.2746319       2.606263   3.739069
+21           333                         0.2893463       2.823545   4.075802
+22           299                         0.2660900       2.519178   3.778448
+23           287                         0.2548461       2.457048   3.647270
+24           276                         0.2465893       2.444667   3.527807
+25           269                         0.2443011       2.337294   3.457068
+26           274                         0.2416780       2.444493   3.540097
+27           270                         0.2380155       2.421748   3.506940
+28           275                         0.2433542       2.440078   3.590189
+29           231                         0.2090063       1.998847   3.030146
+30           197                         0.1822926       1.735182   2.597187
+31           198                         0.1797304       1.749344   2.627985
+32           169                         0.1561086       1.565911   2.278842
+33           169                         0.1546472       1.535592   2.313203
+34           150                         0.1437539       1.364434   2.064661
+   population gdp_capita
+1     8859538   2238.803
+2     8887801   2234.815
+3     8912738   2169.004
+4     8933328   1852.813
+5     8952608   1963.573
+6     8958852   1914.551
+7     8963472   2260.427
+8     8976205   3132.301
+9     8985725   2511.393
+10    8936388   2477.021
+11    8822365   2366.530
+12    8695799   1267.734
+13    8559091   1211.981
+14    8466532   1278.525
+15    8416925   1148.494
+16    8357576   2259.259
+17    8291403   1470.193
+18    8217101   1361.409
+19    8138192   1820.449
+20    8067463   1659.719
+21    8000519   1621.262
+22    7928456   1770.907
+23    7861949   2092.983
+24    7804406   2719.494
+25    7749431   3389.687
+26    7695047   3899.826
+27    7640290   4523.147
+28    7586895   5888.777
+29    7535590   7271.303
+30    7488018   6988.273
+31    7437594   6863.667
+32    7380021   7857.167
+33    7317021   7430.737
+34    7264606   7687.714</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_bulgaria_short 
+Regression with ARIMA(1,0,0) errors 
+
+Coefficients:
+         ar1  population  gdp_capita
+      0.8794      0.4211     -0.1441
+s.e.  0.1014      0.0431      0.0834
+
+sigma^2 = 0.01038:  log likelihood = 30.23
+AIC=-52.46   AICc=-51.08   BIC=-46.36
+
+Training set error measures:
+                       ME       RMSE        MAE        MPE     MAPE      MASE
+Training set -0.009622579 0.09730038 0.07848775 -0.2161251 1.410719 0.9903813
+                 ACF1
+Training set 0.118152</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-136-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from Regression with ARIMA(1,0,0) errors
+Q* = 5.566, df = 6, p-value = 0.4735
+
+Model df: 1.   Total lags used: 7</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arimax_bulgaria)
+W = 0.96667, p-value = 0.3759</code></pre>
+</div>
+</div>
+<p>The residuals of the ARIMAX model satisfy both normality and non autocorrelation hypothesis. Now, we begin the forecast:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   region_code region_name subregion country_code country_name year
+35          EU      Europe         B          BGR     Bulgaria 2014
+36          EU      Europe         B          BGR     Bulgaria 2015
+37          EU      Europe         B          BGR     Bulgaria 2016
+38          EU      Europe         B          BGR     Bulgaria 2017
+39          EU      Europe         B          BGR     Bulgaria 2018
+40          EU      Europe         B          BGR     Bulgaria 2019
+41          EU      Europe         B          BGR     Bulgaria 2020
+42          EU      Europe         B          BGR     Bulgaria 2021
+   number_deaths percent_cause_specific_death_rate age_death_rate death_rate
+35           126                        0.11564726      1.0902586  1.7442011
+36           114                        0.10352625      1.0886572  1.5881881
+37           113                        0.10503811      1.0077564  1.5853370
+38            94                        0.08561722      0.8493058  1.3284441
+39            95                        0.08753663      0.8241317  1.3523060
+40           100                        0.09252149      0.9008798  1.4335354
+41            74                        0.05932577      0.6812141  1.0672028
+42            54                        0.03624283      0.5469074  0.7851413
+   population gdp_capita
+35    7223451   7912.275
+36    7177516   7078.860
+37    7127436   7570.932
+38    7075639   8381.881
+39    7024746   9447.656
+40    6975467   9874.336
+41    6933654  10148.342
+42    6877222  12219.342</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2014       5.046627 4.846907 5.246347
+2015       5.097383 4.831416 5.363350
+2016       5.117647 4.810078 5.425216
+2017       5.128843 4.792610 5.465077
+2018       5.133999 4.777172 5.490827
+2019       5.147045 4.775071 5.519019
+2020       5.160247 4.776968 5.543526
+2021       5.147353 4.755554 5.539151</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-138-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-138-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s plot the predicted versus the actual logarithmic values:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-139-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Finally, we can check the error measures in order to analyze the accuracy of the model.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>          Model         ME      RMSE       MPE       MAE     MAPE
+1 ARIMAX(1,0,0) -0.5854856 0.6495099 -13.31952 0.5854856 13.31952</code></pre>
+</div>
+</div>
+<p>The ARIMAX(<span class="math inline">\(1,0,0\)</span>) model shows a modest overprediction bias (ME = –0.59) and a moderate overall error (RMSE = 0.65, MAE = 0.59) on the log scale. Its MPE of –13.32% and MAPE of 13.32% indicate that forecasts typically exceed actual values by about 13%, reflecting reasonable fit but still room for improvement.</p>
+<p>As we see in the plot, the auto.arima function has not fully capture the structure of the series. Let’s try to adjust manually another ARIMAX model. First, we need to check if the time series are stationary in the lof-transformed scale.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Augmented Dickey-Fuller Test
+
+data:  train_bulgaria_short
+Dickey-Fuller = -1.3331, Lag order = 3, p-value = 0.8314
+alternative hypothesis: stationary</code></pre>
+</div>
+</div>
+<p>The main series is not stationary. We difference this series.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-142-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-142-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF and PACF plots do not show any significant spikes after differencing once the series.</p>
+<p>Next, we difference the log(populatioin) time series over the same short training period:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-143-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-143-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF plot shows a slow exponential decay over the first few lags. In contrast, the PACF shows two large spikes at lags 1 and 2, and then subsequent lags are essentially within the confidence bounds. This pattern is characteristic of an AR(<span class="math inline">\(2\)</span>) process.</p>
+<p>Finally, we difference the log(gdp_capita) series:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-144-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-144-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>It is noticeable that both ACF and PACF show a single spike at lag 4. This pattern may suggest a high MA component for this series.</p>
+<p>Putting all together, we propose the ARIMA(<span class="math inline">\(1,1,1\)</span>).</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_bulgaria_short 
+Regression with ARIMA(1,1,1) errors 
+
+Coefficients:
+         ar1      ma1  population  gdp_capita
+      0.6645  -0.5302      1.0323     -0.0820
+s.e.  0.4020   0.4322      2.8738      0.0754
+
+sigma^2 = 0.0108:  log likelihood = 30.01
+AIC=-50.02   AICc=-47.8   BIC=-42.54</code></pre>
+</div>
+</div>
+<p>The value of the AIC (<span class="math inline">\(-50.02\)</span>) indicates a well-suited fit. Now, we need to check the residuals:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-146-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from Regression with ARIMA(1,1,1) errors
+Q* = 4.9105, df = 5, p-value = 0.4269
+
+Model df: 2.   Total lags used: 7</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arimax_bulgaria_111)
+W = 0.97186, p-value = 0.5146</code></pre>
+</div>
+</div>
+<p>The model’s residuals pass both normality and Ljung-Box tests. Now, we do the forecast.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2014       4.980699 4.777035 5.184362
+2015       4.968816 4.660852 5.276779
+2016       4.946490 4.550349 5.342632
+2017       4.924246 4.449718 5.398773
+2018       4.902745 4.357145 5.448345
+2019       4.889042 4.278238 5.499846
+2020       4.878722 4.207573 5.549871
+2021       4.853813 4.126410 5.581216</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-148-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-148-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s plot the predicted versus the actual logarithmic values:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-149-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Finally, we can check the error measures in order to analyze the accuracy of the model.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>          Model         ME      RMSE       MPE       MAE     MAPE
+1 ARIMAX(1,1,1) -0.3811641 0.4399643 -8.721783 0.3811641 8.721783</code></pre>
+</div>
+</div>
+<p>The ARIMAX(<span class="math inline">\(1,1,1\)</span>) model reduces bias (ME ≈ –0.38) and yields an RMSE of 0.44 on the log‐scale, corresponding to about 8.7% average percentage error (MAPE). These results suggest that including both AR(1) and MA(1) terms alongside population and GDP significantly improves fit over simpler specifications, though there remains a small tendency to overpredict.</p>
+<p><strong>Final conclusions</strong></p>
+<p>Let’s do a summary of the Bulgarian models applied; we are going to change the scale into the original one.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>         Model        ME     RMSE       MPE      MAE     MAPE
+1 ARIMA(1,0,0) -71.58179 76.28034 -87.33556 71.58179 87.33556
+2 ARIMA(1,1,1) -40.60931 43.87869 -50.28430 40.60931 50.28430</code></pre>
+</div>
+</div>
+<p>Comparing the two ARIMA models on the orginal scale, ARIMA(<span class="math inline">\(1,1,1\)</span>) clearly outperforms ARIMA(<span class="math inline">\(1,0,0\)</span>). The ARIMA(1,1,1) model cuts RMSE nearly in half (43.88 vs.&nbsp;76.28) and reduces MAE from 71.58 to 40.61. In percentage terms, its MAPE of 50.28% is substantially better than 87.34% for ARIMA(1,0,0). Both models slightly overpredict (negative ME/MPE), but ARIMA(1,1,1) exhibits much lower bias (ME = –40.61 vs.&nbsp;–71.58). In short, adding one difference and an MA(1) term yields a markedly more accurate fit.</p>
+<p>Finally, we plot both approaches for the test set.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-153-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+</section>
+<section id="logarithmic-regression" class="level2">
+<h2 class="anchored" data-anchor-id="logarithmic-regression">Logarithmic regression</h2>
+<p>We have proved that ARIMA and ARIMAX models do not fit well the time series. The final option, is to apply a logarithmic regression. We will apply two different regressions: the simple regression log(number_deaths) ~ year, and a more complex one, log(number_deaths) ~ year + log(population) + log(gdp_capita).</p>
+<section id="spain-2" class="level3">
+<h3 class="anchored" data-anchor-id="spain-2">Spain</h3>
+<section id="simple-regression" class="level4">
+<h4 class="anchored" data-anchor-id="simple-regression">Simple regression</h4>
+<p>In this first regression, we will use the complete data, not the shorter one.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = train_spain ~ year, data = train_spain_df)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.29373 -0.08712 -0.01259  0.07245  0.67384 
+
+Coefficients:
+              Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept) 137.934885   2.400463   57.46   &lt;2e-16 ***
+year         -0.065830   0.001212  -54.31   &lt;2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.1626 on 58 degrees of freedom
+Multiple R-squared:  0.9807,    Adjusted R-squared:  0.9804 
+F-statistic:  2950 on 1 and 58 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+</div>
+<p>The linear regression of log(number_deaths) on year yields an intercept of 137.93 and a slope of –0.0658 (both highly significant, <span class="math inline">\(p&lt;2\mathrm{e}{-16}\)</span>), indicating a strong, steady annual decline in log‐deaths. The model explains 98.07% of the variance (<span class="math inline">\(R^2=0.9807\)</span>), with residuals showing a low standard error (0.1626), confirming an excellent fit during 1960–2000.</p>
+<p>Now, we need to further study the residuals of the model.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-155-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Breusch-Godfrey test for serial correlation of order up to 10
+
+data:  Residuals
+LM test = 29.705, df = 10, p-value = 0.0009573</code></pre>
+</div>
+</div>
+<p>As we see in the plot, the model has not fully capture the structure of the series, meaning we will need to determine an ARIMA structure for the residuals. We begin by plotting the ACF and PACF.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-156-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-156-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF plot shows an exponential decaying trend, whereas the PACF shows a significant spike at lag 1. This pattern may suggest an AR(<span class="math inline">\(1\)</span>) component for the residuals.</p>
+<p>Let’s fit an ARMA(<span class="math inline">\(1,0\)</span>).</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: simple_spain_residuals 
+ARIMA(1,0,0) with non-zero mean 
+
+Coefficients:
+         ar1    mean
+      0.9325  0.1624
+s.e.  0.0596  0.1840
+
+sigma^2 = 0.009391:  log likelihood = 54.9
+AIC=-103.8   AICc=-103.37   BIC=-97.52
+
+Training set error measures:
+                      ME       RMSE        MAE      MPE     MAPE      MASE
+Training set -0.01340121 0.09528002 0.06396348 166.4684 213.3983 0.9852093
+                   ACF1
+Training set -0.1665804</code></pre>
+</div>
+</div>
+<p>It seems a well-fitted model (AIC value of <span class="math inline">\(-103.8\)</span>). Now, we check the residuals of the model:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-158-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(1,0,0) with non-zero mean
+Q* = 4.6462, df = 9, p-value = 0.864
+
+Model df: 1.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arima_simple_spain_residuals)
+W = 0.91908, p-value = 0.0007045</code></pre>
+</div>
+</div>
+<p>The residuals have checked the Ljung-Box text; however, they do not pass the normality test.</p>
+<p>We begin the forecast phase. The forecast is divided into two steps: 1. The trend pronostic 2. The residuals pronostic</p>
+<p>The final pronostic is given by the sum of the above ones.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Time Series:
+Start = 2011 
+End = 2021 
+Frequency = 1 
+       1        2        3        4        5        6        7        8 
+362.2796 335.1067 310.2257 287.4114 266.4645 247.2084 229.4858 213.1568 
+       9       10       11 
+198.0964 184.1925 171.3447 </code></pre>
+</div>
+</div>
+<p>Finally, we plot the forecasted time series versus the real values, on the original scale.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-160-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>It is clear that the model have given a more adjusted prediction that all the models tried before. Finally, we need to analyze the error measures.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>                      Model        ME     RMSE       MPE      MAE     MAPE
+1 log(number_deaths) ~ year -4.815682 28.11484 -1.040657 20.54576 7.930388</code></pre>
+</div>
+</div>
+<p>The trend‐plus‐AR(1) model on <span class="math inline">\(\log(\text{number_deaths}) \sim \text{year}\)</span> delivers a modest bias (ME = <span class="math inline">\(–4.82\)</span> deaths) and a low RMSE of <span class="math inline">\(28.11\)</span>, corresponding to an average absolute error of <span class="math inline">\(20.55\)</span> deaths. Its MAPE of <span class="math inline">\(7.93\)</span>% indicates that forecasts typically deviate by less than <span class="math inline">\(8\)</span>%, a substantial improvement over earlier ARIMA‐only approaches. Overall, this specification captures the downward TB mortality trend very effectively.</p>
+</section>
+<section id="complete-regression" class="level4">
+<h4 class="anchored" data-anchor-id="complete-regression">Complete regression</h4>
+<p>Now, as we have the population and gdp per capita regressors, we will define a regression model with those variables. Note that in this approach, the shorter dataset will be used, in order to asses the discrepancies on variables’ lengths.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = train_spain_short ~ year + log_population_spain + 
+    log_gdp_capita_spain, data = spain_short_train_df)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.25334 -0.05954  0.02206  0.06787  0.23822 
+
+Coefficients:
+                       Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)          100.637043  11.328486   8.884 1.53e-11 ***
+year                  -0.032818   0.005862  -5.599 1.15e-06 ***
+log_population_spain  -1.508314   0.815125  -1.850  0.07068 .  
+log_gdp_capita_spain  -0.224880   0.060343  -3.727  0.00053 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.1022 on 46 degrees of freedom
+Multiple R-squared:  0.9889,    Adjusted R-squared:  0.9882 
+F-statistic:  1365 on 3 and 46 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+</div>
+<p>The multiple regression of <span class="math inline">\(\log(\text{deaths})\)</span> on year, <span class="math inline">\(\log(\text{population})\)</span>, and <span class="math inline">\(\log(\text{GDP per capita})\)</span> explains 98.9% of the variance (<span class="math inline">\(R^2 = 0.9889\)</span>) with a very small residual error (0.102). Holding population and GDP constant, the coefficient for year is <span class="math inline">\(-0.0328\)</span> (<span class="math inline">\(p &lt; 10^{-6}\)</span>), indicating a significant annual decline in log‐deaths. While <span class="math inline">\(\log(\text{GDP per capita})\)</span> also has a significant negative effect (<span class="math inline">\(\beta = -0.2249,\;p = 0.0005\)</span>), <span class="math inline">\(\log(\text{population})\)</span> shows a marginally non‐significant negative association (<span class="math inline">\(\beta = -1.5083,\;p = 0.0707\)</span>).</p>
+<p>Now, we need to check the residuals of the model.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-163-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Breusch-Godfrey test for serial correlation of order up to 10
+
+data:  Residuals
+LM test = 29.871, df = 10, p-value = 0.0008992</code></pre>
+</div>
+</div>
+<p>As the simple regression, the residuals for this more complex model do not satisfy any of the conditions, meaning that the regression still not capture all the interal structure.</p>
+<p>We need to further study the residuals.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-164-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-164-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF plot shows a very large spike at lag 1 followed by a gradual decay over lags 2-7, where it begins to increase again. The PACF plot exhibits a single dominant spike at lag 1 with all higher-lag partial autocorrelations inside the confidence boundaries. This pattern may suggest, as the simple regression model, an AR(<span class="math inline">\(1\)</span>) process.</p>
+<p>We fit this model on the residuals.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: complete_spain_residuals 
+ARIMA(1,0,0) with non-zero mean 
+
+Coefficients:
+         ar1    mean
+      0.7026  0.0097
+s.e.  0.1073  0.0332
+
+sigma^2 = 0.005447:  log likelihood = 60.05
+AIC=-114.1   AICc=-113.58   BIC=-108.36
+
+Training set error measures:
+                       ME       RMSE        MAE       MPE     MAPE      MASE
+Training set 0.0004432149 0.07231573 0.05614331 -152.5339 296.1283 0.9138432
+                  ACF1
+Training set -0.160539</code></pre>
+</div>
+</div>
+<p>The low AIC value indicates a good fit. We check now the residuals:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-166-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(1,0,0) with non-zero mean
+Q* = 11.289, df = 9, p-value = 0.2564
+
+Model df: 1.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arima_complete_spain_residuals)
+W = 0.97985, p-value = 0.5456</code></pre>
+</div>
+</div>
+<p>Now the residuals satisfy the necessary hypothesis. We begin the pronostics.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Time Series:
+Start = 51 
+End = 62 
+Frequency = 1 
+       1        2        3        4        5        6        7        8 
+358.0592 325.9648 312.6085 295.2230 281.3289 277.7973 264.4315 249.9083 
+       9       10       11       12 
+235.1404 225.7874 220.8977 207.3166 </code></pre>
+</div>
+</div>
+<p>Finally, let’s plot the new regression:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   Year Actual Forecast
+1  2010    392 358.0592
+2  2011    288 325.9648
+3  2012    320 312.6085
+4  2013    291 295.2230
+5  2014    279 281.3289
+6  2015    244 277.7973
+7  2016    250 264.4315
+8  2017    242 249.9083
+9  2018    249 235.1404
+10 2019    217 225.7874
+11 2020    198 220.8977
+12 2021    174 207.3166</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-168-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>                                                          Model        ME
+1 log(number_deaths) ~ year + log(population) + log(gdp_capita) -17.87195
+      RMSE       MPE      MAE     MAPE
+1 38.89572 -8.067772 31.31918 12.73695</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="bulgaria-2" class="level3">
+<h3 class="anchored" data-anchor-id="bulgaria-2">Bulgaria</h3>
+<section id="simple-regression-1" class="level4">
+<h4 class="anchored" data-anchor-id="simple-regression-1">Simple regression</h4>
+<p>In this first regression, we will use the complete data, not the shorter one.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   region_code region_name subregion country_code country_name year
+1           EU      Europe         B          BGR     Bulgaria 1964
+2           EU      Europe         B          BGR     Bulgaria 1965
+3           EU      Europe         B          BGR     Bulgaria 1966
+4           EU      Europe         B          BGR     Bulgaria 1967
+5           EU      Europe         B          BGR     Bulgaria 1968
+6           EU      Europe         B          BGR     Bulgaria 1969
+7           EU      Europe         B          BGR     Bulgaria 1970
+8           EU      Europe         B          BGR     Bulgaria 1971
+9           EU      Europe         B          BGR     Bulgaria 1972
+10          EU      Europe         B          BGR     Bulgaria 1973
+11          EU      Europe         B          BGR     Bulgaria 1974
+12          EU      Europe         B          BGR     Bulgaria 1975
+13          EU      Europe         B          BGR     Bulgaria 1976
+14          EU      Europe         B          BGR     Bulgaria 1977
+15          EU      Europe         B          BGR     Bulgaria 1978
+16          EU      Europe         B          BGR     Bulgaria 1979
+17          EU      Europe         B          BGR     Bulgaria 1980
+18          EU      Europe         B          BGR     Bulgaria 1981
+19          EU      Europe         B          BGR     Bulgaria 1982
+20          EU      Europe         B          BGR     Bulgaria 1983
+21          EU      Europe         B          BGR     Bulgaria 1984
+22          EU      Europe         B          BGR     Bulgaria 1985
+23          EU      Europe         B          BGR     Bulgaria 1986
+24          EU      Europe         B          BGR     Bulgaria 1987
+25          EU      Europe         B          BGR     Bulgaria 1988
+26          EU      Europe         B          BGR     Bulgaria 1989
+27          EU      Europe         B          BGR     Bulgaria 1990
+28          EU      Europe         B          BGR     Bulgaria 1991
+29          EU      Europe         B          BGR     Bulgaria 1992
+30          EU      Europe         B          BGR     Bulgaria 1993
+31          EU      Europe         B          BGR     Bulgaria 1994
+32          EU      Europe         B          BGR     Bulgaria 1995
+33          EU      Europe         B          BGR     Bulgaria 1996
+34          EU      Europe         B          BGR     Bulgaria 1997
+35          EU      Europe         B          BGR     Bulgaria 1998
+36          EU      Europe         B          BGR     Bulgaria 1999
+37          EU      Europe         B          BGR     Bulgaria 2000
+38          EU      Europe         B          BGR     Bulgaria 2001
+39          EU      Europe         B          BGR     Bulgaria 2002
+40          EU      Europe         B          BGR     Bulgaria 2003
+41          EU      Europe         B          BGR     Bulgaria 2004
+42          EU      Europe         B          BGR     Bulgaria 2005
+43          EU      Europe         B          BGR     Bulgaria 2006
+44          EU      Europe         B          BGR     Bulgaria 2007
+45          EU      Europe         B          BGR     Bulgaria 2008
+46          EU      Europe         B          BGR     Bulgaria 2009
+47          EU      Europe         B          BGR     Bulgaria 2010
+48          EU      Europe         B          BGR     Bulgaria 2011
+   number_deaths percent_cause_specific_death_rate age_death_rate death_rate
+1           1157                         1.7943827      13.458590  14.206255
+2           1104                         1.6484993      12.451803  13.461116
+3           1070                         1.5651055      11.939526  12.956976
+4           1166                         1.5609939      12.817377  14.030950
+5           1002                         1.3882731      10.732002  11.971898
+6            944                         1.1773069       9.939494  11.192526
+7            892                         1.1570141       9.141033  10.506973
+8            840                         1.0144315       8.509242   9.840214
+9            764                         0.9076437       7.568611   8.908374
+10           647                         0.7941574       6.376634   7.504930
+11           565                         0.6628421       5.336814   6.510192
+12           621                         0.6901994       5.862291   7.120090
+13           573                         0.6485716       5.303017   6.542141
+14           508                         0.5383523       4.613740   5.769973
+15           477                         0.5159825       4.342829   5.411845
+16           476                         0.5042213       4.333327   5.393218
+17           349                         0.3563042       3.015428   3.938385
+18           332                         0.3478589       2.836083   3.734071
+19           339                         0.3380096       2.924209   3.801514
+20           344                         0.3366542       2.944172   3.847961
+21           314                         0.3096067       2.664097   3.504191
+22           260                         0.2418942       2.090483   2.902142
+23           249                         0.2393333       2.051553   2.779762
+24           233                         0.2173244       1.944651   2.597142
+25           255                         0.2374633       2.109092   2.839201
+26           240                         0.2245047       2.013402   2.669781
+27           209                         0.1924352       1.716632   2.324598
+28           224                         0.2028563       1.797896   2.493877
+29           269                         0.2490787       2.252225   3.149809
+30           286                         0.2610918       2.390466   3.375707
+31           325                         0.2907315       2.787220   3.849069
+32           332                         0.2895265       2.763979   3.949513
+33           342                         0.2921679       2.881420   4.089539
+34           387                         0.3175749       3.378461   4.655919
+35           395                         0.3342076       3.483218   4.783936
+36           307                         0.2746319       2.606263   3.739069
+37           333                         0.2893463       2.823545   4.075802
+38           299                         0.2660900       2.519178   3.778448
+39           287                         0.2548461       2.457048   3.647270
+40           276                         0.2465893       2.444667   3.527807
+41           269                         0.2443011       2.337294   3.457068
+42           274                         0.2416780       2.444493   3.540097
+43           270                         0.2380155       2.421748   3.506940
+44           275                         0.2433542       2.440078   3.590189
+45           231                         0.2090063       1.998847   3.030146
+46           197                         0.1822926       1.735182   2.597187
+47           198                         0.1797304       1.749344   2.627985
+48           169                         0.1561086       1.565911   2.278842
+   population gdp_capita
+1     8140078         NA
+2     8202417         NA
+3     8258788         NA
+4     8311127         NA
+5     8370642         NA
+6     8435276         NA
+7     8490822         NA
+8     8538899         NA
+9     8579911         NA
+10    8624801         NA
+11    8682749         NA
+12    8723148         NA
+13    8759432         NA
+14    8804691         NA
+15    8813739         NA
+16    8824994         NA
+17    8859538   2238.803
+18    8887801   2234.815
+19    8912738   2169.004
+20    8933328   1852.813
+21    8952608   1963.573
+22    8958852   1914.551
+23    8963472   2260.427
+24    8976205   3132.301
+25    8985725   2511.393
+26    8936388   2477.021
+27    8822365   2366.530
+28    8695799   1267.734
+29    8559091   1211.981
+30    8466532   1278.525
+31    8416925   1148.494
+32    8357576   2259.259
+33    8291403   1470.193
+34    8217101   1361.409
+35    8138192   1820.449
+36    8067463   1659.719
+37    8000519   1621.262
+38    7928456   1770.907
+39    7861949   2092.983
+40    7804406   2719.494
+41    7749431   3389.687
+42    7695047   3899.826
+43    7640290   4523.147
+44    7586895   5888.777
+45    7535590   7271.303
+46    7488018   6988.273
+47    7437594   6863.667
+48    7380021   7857.167</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = train_bulgaria ~ year, data = train_bulgaria_df)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.53873 -0.23312  0.06127  0.23183  0.42098 
+
+Coefficients:
+             Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept) 71.576183   5.880911   12.17 5.51e-16 ***
+year        -0.033013   0.002959  -11.16 1.12e-14 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.284 on 46 degrees of freedom
+Multiple R-squared:  0.7302,    Adjusted R-squared:  0.7243 
+F-statistic: 124.5 on 1 and 46 DF,  p-value: 1.117e-14</code></pre>
+</div>
+</div>
+<p>The linear regression of log(number_deaths) on year yields an intercept of 71.57 and a slope of –0.033 (both highly significant, <span class="math inline">\(p&lt;2\mathrm{e}{-16}\)</span>), indicating a strong, steady annual decline in log‐deaths. The model explains 98.07% of the variance (<span class="math inline">\(R^2=0.9807\)</span>), with residuals showing a low standard error (0.1626), confirming an excellent fit during 1960–2000.</p>
+<p>Now, we need to further study the residuals of the model.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-171-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Breusch-Godfrey test for serial correlation of order up to 10
+
+data:  Residuals
+LM test = 41.898, df = 10, p-value = 7.819e-06</code></pre>
+</div>
+</div>
+<p>As we see in the plot, the model has not fully capture the structure of the series, meaning we will need to determine an ARIMA structure for the residuals. We begin by plotting the ACF and PACF.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-172-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-172-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF plot shows an exponential decaying trend, whereas the PACF shows a significant spike at lag 1. This pattern may suggest an AR(<span class="math inline">\(1\)</span>) component for the residuals.</p>
+<p>Let’s fit an ARMA(<span class="math inline">\(1,0\)</span>).</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: simple_bulgaria_residuals 
+ARIMA(1,0,0) with non-zero mean 
+
+Coefficients:
+         ar1    mean
+      0.9289  0.0453
+s.e.  0.0461  0.1631
+
+sigma^2 = 0.01024:  log likelihood = 41.88
+AIC=-77.76   AICc=-77.21   BIC=-72.14
+
+Training set error measures:
+                       ME       RMSE        MAE       MPE     MAPE     MASE
+Training set -0.008745631 0.09905412 0.07909578 -3.687074 78.29747 0.993257
+                   ACF1
+Training set 0.09638889</code></pre>
+</div>
+</div>
+<p>It seems a well-fitted model (AIC value of <span class="math inline">\(-77.76\)</span>). Now, we check the residuals of the model:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-174-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(1,0,0) with non-zero mean
+Q* = 5.2721, df = 9, p-value = 0.81
+
+Model df: 1.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arima_simple_bulgaria_residuals)
+W = 0.98588, p-value = 0.8262</code></pre>
+</div>
+</div>
+<p>The residuals have checked the Ljung-Box text; however, they do not pass the normality test.</p>
+<p>We begin the forecast phase. The forecast is divided into two steps: 1. The trend pronostic 2. The residuals pronostic</p>
+<p>The final pronostic is given by the sum of the above ones.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Time Series:
+Start = 2028 
+End = 2037 
+Frequency = 1 
+       1        2        3        4        5        6        7        8 
+164.7160 160.4569 156.2322 152.0503 147.9185 143.8431 139.8295 135.8824 
+       9       10 
+132.0056 128.2023 </code></pre>
+</div>
+</div>
+<p>Finally, we plot the forecasted time series versus the real values, on the original scale.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-176-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>                      Model        ME     RMSE       MPE      MAE     MAPE
+1 log(number_deaths) ~ year -37.21369 42.84976 -44.46026 38.07049 44.96724</code></pre>
+</div>
+</div>
+<p>The trend‐only regression (log deaths ~ year) achieves ME = –37.21, RMSE = 42.85, and MAPE ≈ 44.97%, slightly outperforming ARIMA(1,1,1) on RMSE (43.88 vs.&nbsp;42.85) and MAPE (50.28% vs.&nbsp;44.97%). Although both models overpredict modestly, the simple linear trend captures most of the series’ dynamics with comparable or better average error than the more complex ARIMA.</p>
+</section>
+<section id="complete-regression-1" class="level4">
+<h4 class="anchored" data-anchor-id="complete-regression-1">Complete regression</h4>
+<p>Now, as we have the population and gdp per capita regressors, we will define a regression model with those variables. Note that in this approach, the shorter dataset will be used, in order to asses the discrepancies on variables’ lengths.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = train_bulgaria_short ~ year + log_population_bulgaria + 
+    log_gdp_capita_bulgaria, data = bulgaria_short_train_df)
+
+Residuals:
+      Min        1Q    Median        3Q       Max 
+-0.301893 -0.058153 -0.008973  0.083483  0.273151 
+
+Coefficients:
+                         Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)             202.31231   51.55533   3.924 0.000470 ***
+year                     -0.04583    0.01230  -3.727 0.000803 ***
+log_population_bulgaria  -6.45215    1.72393  -3.743 0.000770 ***
+log_gdp_capita_bulgaria  -0.31674    0.05764  -5.496 5.75e-06 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.1431 on 30 degrees of freedom
+Multiple R-squared:  0.673, Adjusted R-squared:  0.6403 
+F-statistic: 20.58 on 3 and 30 DF,  p-value: 1.948e-07</code></pre>
+</div>
+</div>
+<p>The multiple regression of <span class="math inline">\(\log(\text{deaths})\)</span> on year, <span class="math inline">\(\log(\text{population})\)</span>, and <span class="math inline">\(\log(\text{GDP per capita})\)</span> explains 64.03% of the variance (<span class="math inline">\(R^2 = 0.6403\)</span>) with a very small residual error (0.1431). Holding population and GDP constant, the coefficient for year is <span class="math inline">\(-0.04583\)</span>, indicating a significant annual decline in log‐deaths.</p>
+<p>Now, we need to check the residuals of the model.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-179-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Breusch-Godfrey test for serial correlation of order up to 7
+
+data:  Residuals
+LM test = 19.863, df = 7, p-value = 0.005873</code></pre>
+</div>
+</div>
+<p>In contrast with the simple regression, the residuals of the regression do not capture all the temporal structure. We need to further study the residuals.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-180-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-180-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF plot shows a spike at lag 1 followed by a gradual decay over lags 2-5, where it begins to increase again and has significant spikes at lags 4-5. The PACF plot exhibits a single dominant spike at lag 1 with all higher-lag partial autocorrelations inside the confidence boundaries. This pattern may suggest a more complex model for the residuals. We will study the ARMA(1,1).</p>
+<p>We fit this model on the residuals.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: complete_bulgaria_residuals 
+ARIMA(1,0,4) with non-zero mean 
+
+Coefficients:
+         ar1     ma1     ma2      ma3      ma4    mean
+      0.6877  0.0307  0.1444  -0.3590  -0.8161  0.0039
+s.e.  0.1571  0.1405  0.1724   0.1408   0.1577  0.0132
+
+sigma^2 = 0.007082:  log likelihood = 35.57
+AIC=-57.14   AICc=-52.83   BIC=-46.46
+
+Training set error measures:
+                       ME       RMSE        MAE       MPE     MAPE      MASE
+Training set -0.002168514 0.07637004 0.06455825 -208.9866 341.3274 0.7133897
+                   ACF1
+Training set 0.03566269</code></pre>
+</div>
+</div>
+<p>The low AIC value indicates a good fit. We check now the residuals:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-182-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(1,0,4) with non-zero mean
+Q* = 3.3551, df = 3, p-value = 0.34
+
+Model df: 5.   Total lags used: 8</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arima_complete_bulgaria_residuals)
+W = 0.98061, p-value = 0.7919</code></pre>
+</div>
+</div>
+<p>Now the residuals satisfy the necessary hypothesis. We begin the pronostics.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Time Series:
+Start = 35 
+End = 42 
+Frequency = 1 
+       1        2        3        4        5        6        7        8 
+151.6815 176.0873 199.8392 218.1363 201.9983 193.7491 187.1831 175.4329 </code></pre>
+</div>
+</div>
+<p>Finally, let’s plot the new regression:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>  Year Actual Forecast
+1 2014    126 151.6815
+2 2015    114 176.0873
+3 2016    113 199.8392
+4 2017     94 218.1363
+5 2018     95 201.9983
+6 2019    100 193.7491
+7 2020     74 187.1831
+8 2021     54 175.4329</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-184-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>                                                          Model        ME
+1 log(number_deaths) ~ year + log(population) + log(gdp_capita) -91.76346
+     RMSE       MPE      MAE     MAPE
+1 96.9917 -108.4948 91.76346 108.4948</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="the-netherlands-2" class="level3">
+<h3 class="anchored" data-anchor-id="the-netherlands-2">The Netherlands</h3>
+<section id="simple-regression-2" class="level4">
+<h4 class="anchored" data-anchor-id="simple-regression-2">Simple regression</h4>
+<p>In this first regression, we will use the complete data, not the shorter one.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   region_code region_name subregion country_code country_name year
+1           EU      Europe         W          NLD  Netherlands 1950
+2           EU      Europe         W          NLD  Netherlands 1951
+3           EU      Europe         W          NLD  Netherlands 1952
+4           EU      Europe         W          NLD  Netherlands 1953
+5           EU      Europe         W          NLD  Netherlands 1954
+6           EU      Europe         W          NLD  Netherlands 1955
+7           EU      Europe         W          NLD  Netherlands 1956
+8           EU      Europe         W          NLD  Netherlands 1957
+9           EU      Europe         W          NLD  Netherlands 1958
+10          EU      Europe         W          NLD  Netherlands 1959
+11          EU      Europe         W          NLD  Netherlands 1960
+12          EU      Europe         W          NLD  Netherlands 1961
+13          EU      Europe         W          NLD  Netherlands 1962
+14          EU      Europe         W          NLD  Netherlands 1963
+15          EU      Europe         W          NLD  Netherlands 1964
+16          EU      Europe         W          NLD  Netherlands 1965
+17          EU      Europe         W          NLD  Netherlands 1966
+18          EU      Europe         W          NLD  Netherlands 1967
+19          EU      Europe         W          NLD  Netherlands 1968
+20          EU      Europe         W          NLD  Netherlands 1969
+21          EU      Europe         W          NLD  Netherlands 1970
+22          EU      Europe         W          NLD  Netherlands 1971
+23          EU      Europe         W          NLD  Netherlands 1972
+24          EU      Europe         W          NLD  Netherlands 1973
+25          EU      Europe         W          NLD  Netherlands 1974
+26          EU      Europe         W          NLD  Netherlands 1975
+27          EU      Europe         W          NLD  Netherlands 1976
+28          EU      Europe         W          NLD  Netherlands 1977
+29          EU      Europe         W          NLD  Netherlands 1978
+30          EU      Europe         W          NLD  Netherlands 1979
+31          EU      Europe         W          NLD  Netherlands 1980
+32          EU      Europe         W          NLD  Netherlands 1981
+33          EU      Europe         W          NLD  Netherlands 1982
+34          EU      Europe         W          NLD  Netherlands 1983
+35          EU      Europe         W          NLD  Netherlands 1984
+36          EU      Europe         W          NLD  Netherlands 1985
+37          EU      Europe         W          NLD  Netherlands 1986
+38          EU      Europe         W          NLD  Netherlands 1987
+39          EU      Europe         W          NLD  Netherlands 1988
+40          EU      Europe         W          NLD  Netherlands 1989
+41          EU      Europe         W          NLD  Netherlands 1990
+42          EU      Europe         W          NLD  Netherlands 1991
+43          EU      Europe         W          NLD  Netherlands 1992
+44          EU      Europe         W          NLD  Netherlands 1993
+45          EU      Europe         W          NLD  Netherlands 1994
+46          EU      Europe         W          NLD  Netherlands 1995
+47          EU      Europe         W          NLD  Netherlands 1996
+48          EU      Europe         W          NLD  Netherlands 1997
+49          EU      Europe         W          NLD  Netherlands 1998
+50          EU      Europe         W          NLD  Netherlands 1999
+51          EU      Europe         W          NLD  Netherlands 2000
+52          EU      Europe         W          NLD  Netherlands 2001
+53          EU      Europe         W          NLD  Netherlands 2002
+54          EU      Europe         W          NLD  Netherlands 2003
+55          EU      Europe         W          NLD  Netherlands 2004
+56          EU      Europe         W          NLD  Netherlands 2005
+57          EU      Europe         W          NLD  Netherlands 2006
+58          EU      Europe         W          NLD  Netherlands 2007
+59          EU      Europe         W          NLD  Netherlands 2008
+60          EU      Europe         W          NLD  Netherlands 2009
+61          EU      Europe         W          NLD  Netherlands 2010
+   number_deaths percent_cause_specific_death_rate age_death_rate death_rate
+1           1922                        2.54300079     19.5532750 19.0043012
+2           1657                        2.14653989     16.5065474 16.1433317
+3           1278                        1.68188877     12.5840259 12.3097669
+4            966                        1.19924023      9.3187741  9.2059620
+5            798                        1.00636862      7.6108754  7.5174512
+6            717                        0.88122511      6.7469330  6.6692091
+7            596                        0.70515020      5.4777509  5.4732125
+8            515                        0.62290601      4.6825156  4.6706087
+9            482                        0.57261657      4.2576492  4.3086110
+10           414                        0.48278757      3.5532061  3.6483486
+11           325                        0.37148801      2.7437928  2.8293838
+12           316                        0.35940539      2.6297084  2.7150799
+13           296                        0.31638128      2.4116499  2.5072634
+14           251                        0.26218480      1.9752148  2.0976099
+15           230                        0.24615516      1.7631420  1.8965631
+16           222                        0.22647053      1.6755866  1.8056561
+17           187                        0.18604003      1.3623827  1.5012484
+18           176                        0.17636684      1.2627974  1.3970250
+19           197                        0.18763871      1.4131242  1.5475620
+20           167                        0.15518283      1.1653621  1.2967852
+21           156                        0.14231110      1.0424142  1.1964567
+22           209                        0.18958120      1.3842304  1.5839933
+23           206                        0.18137635      1.3120618  1.5455487
+24           190                        0.17166296      1.2158470  1.4137641
+25           182                        0.16659039      1.1342663  1.3436593
+26           199                        0.17496505      1.1732114  1.4561473
+27           140                        0.12231988      0.8452214  1.0164077
+28           101                        0.09174062      0.5957890  0.7289156
+29           173                        0.15120395      0.9900729  1.2408817
+30           177                        0.15724248      0.9938939  1.2608364
+31           162                        0.14175833      0.8967193  1.1448925
+32           178                        0.15409254      0.9205673  1.2493683
+33           178                        0.15179424      0.9172912  1.2436507
+34           161                        0.13671759      0.8053623  1.1206159
+35           166                        0.13855040      0.8103940  1.1508437
+36           138                        0.11246577      0.6859192  0.9522692
+37           166                        0.13247464      0.7936857  1.1391554
+38           157                        0.12847896      0.7200449  1.0705689
+39           151                        0.12161433      0.6912587  1.0230283
+40           162                        0.12567395      0.7005508  1.0909973
+41           136                        0.10557039      0.5776036  0.9096077
+42           120                        0.09233752      0.5196465  0.7963051
+43           142                        0.10932580      0.5730137  0.9351888
+44           172                        0.12482311      0.7061930  1.1248888
+45           140                        0.10489170      0.5524166  0.9101074
+46           138                        0.10171365      0.5451569  0.8926839
+47           127                        0.09232268      0.4733110  0.8177457
+48           105                        0.07732927      0.4079446  0.6726199
+49           118                        0.08582942      0.4471409  0.7512478
+50           120                        0.08541716      0.4679117  0.7589125
+51            91                        0.06475624      0.3458279  0.5714102
+52            87                        0.06197596      0.3398740  0.5421851
+53            72                        0.05057778      0.2705021  0.4458500
+54            72                        0.05072709      0.2610800  0.4437513
+55            78                        0.05712068      0.2783823  0.4790631
+56            70                        0.05131890      0.2437266  0.4289213
+57            76                        0.05614160      0.2558262  0.4649387
+58            54                        0.04059479      0.1642595  0.3296362
+59            51                        0.03773976      0.1560307  0.3101135
+60            62                        0.04618766      0.2073890  0.3750668
+61            54                        0.03968896      0.1726799  0.3249998
+   population gdp_capita
+1    10113759         NA
+2    10264537         NA
+3    10382295         NA
+4    10493533         NA
+5    10615730         NA
+6    10751230         NA
+7    10889768         NA
+8    11026877         NA
+9    11187365         NA
+10   11348108         NA
+11   11486909   1154.687
+12   11639371   1252.577
+13   11807552   1340.396
+14   11969156   1434.776
+15   12131887   1665.879
+16   12301136   1845.382
+17   12464282   1983.351
+18   12607834   2151.413
+19   12740849   2360.885
+20   12890638   2642.956
+21   13052082   2927.073
+22   13208353   3378.615
+23   13342780   4104.451
+24   13453743   5345.575
+25   13559670   6440.978
+26   13680031   7335.509
+27   13786640   7925.688
+28   13868607   9166.808
+29   13953922  11179.390
+30   14050176  12798.543
+31   14162687  13791.862
+32   14262690  11520.448
+33   14333902  11072.658
+34   14396901  10680.359
+35   14462810   9977.160
+36   14538958   9926.130
+37   14626489  13783.850
+38   14724947  16709.560
+39   14825916  17744.501
+40   14921107  17397.692
+41   15030884  21290.860
+42   15155091  21732.231
+43   15276786  23904.037
+44   15389718  23122.411
+45   15485453  24646.314
+46   15565033  29258.134
+47   15640031  29006.809
+48   15723620  26700.537
+49   15827109  27885.808
+50   15940182  28272.643
+51   16058758  26214.499
+52   16182705  26896.548
+53   16288060  29343.245
+54   16366914  35750.975
+55   16425561  40436.618
+56   16465707  41994.714
+57   16493851  44900.938
+58   16531360  51799.209
+59   16597257  57879.944
+60   16684147  52722.213
+61   16771232  50999.745</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = train_netherlands ~ year, data = train_netherlands_df)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.73525 -0.24610  0.00716  0.16115  1.11139 
+
+Coefficients:
+             Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept) 85.847876   5.206165   16.49   &lt;2e-16 ***
+year        -0.040717   0.002629  -15.49   &lt;2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.3616 on 59 degrees of freedom
+Multiple R-squared:  0.8026,    Adjusted R-squared:  0.7992 
+F-statistic: 239.8 on 1 and 59 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+</div>
+<p>The linear regression of log(number_deaths) on year yields an intercept of 85.84 and a slope of –0.04 (both highly significant, <span class="math inline">\(p&lt;2\mathrm{e}{-16}\)</span>), indicating a strong, steady annual decline in log‐deaths. The model explains 79.92% of the variance (<span class="math inline">\(R^2=0.7992\)</span>), with residuals showing a moderate standard error (0.3616).</p>
+<p>Now, we need to further study the residuals of the model.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-187-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Breusch-Godfrey test for serial correlation of order up to 10
+
+data:  Residuals
+LM test = 42.342, df = 10, p-value = 6.519e-06</code></pre>
+</div>
+</div>
+<p>As we see in the plot, the model has not fully capture the structure of the series, meaning we will need to determine an ARIMA structure for the residuals. We begin by plotting the ACF and PACF.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-188-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-188-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF plot shows an exponential decaying trend, whereas the PACF shows a significant spike at lag 1. This pattern may suggest an AR(<span class="math inline">\(1\)</span>) component for the residuals.</p>
+<p>Let’s fit an ARMA(<span class="math inline">\(1,0\)</span>).</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: simple_netherlands_residuals 
+ARIMA(1,0,0) with non-zero mean 
+
+Coefficients:
+         ar1    mean
+      0.9408  0.1863
+s.e.  0.0479  0.2973
+
+sigma^2 = 0.02599:  log likelihood = 24.7
+AIC=-43.4   AICc=-42.98   BIC=-37.07
+
+Training set error measures:
+                      ME     RMSE       MAE       MPE     MAPE     MASE
+Training set -0.02419455 0.158559 0.1240325 -31.08554 139.8005 1.017711
+                   ACF1
+Training set -0.1029676</code></pre>
+</div>
+</div>
+<p>It seems a well-fitted model (AIC value of <span class="math inline">\(-43.4\)</span>). Now, we check the residuals of the model:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-190-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(1,0,0) with non-zero mean
+Q* = 15.933, df = 9, p-value = 0.0683
+
+Model df: 1.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arima_simple_netherlands_residuals)
+W = 0.95736, p-value = 0.03272</code></pre>
+</div>
+</div>
+<p>The residuals have checked the Ljung-Box text; however, they do not pass the normality test.</p>
+<p>We begin the forecast phase. The forecast is divided into two steps: 1. The trend pronostic 2. The residuals pronostic</p>
+<p>The final pronostic is given by the sum of the above ones.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Time Series:
+Start = 2011 
+End = 2022 
+Frequency = 1 
+       1        2        3        4        5        6        7        8 
+52.47497 50.95662 49.44898 47.95563 46.47974 45.02407 43.59105 42.18274 
+       9       10       11       12 
+40.80092 39.44706 38.12241 36.82795 </code></pre>
+</div>
+</div>
+<p>Finally, we plot the forecasted time series versus the real values, on the original scale.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-192-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>                      Model        ME     RMSE       MPE      MAE     MAPE
+1 log(number_deaths) ~ year -15.52601 16.03702 -60.48996 15.52601 60.48996</code></pre>
+</div>
+</div>
+</section>
+<section id="complete-regression-2" class="level4">
+<h4 class="anchored" data-anchor-id="complete-regression-2">Complete regression</h4>
+<p>Now, as we have the population and gdp per capita regressors, we will define a regression model with those variables. Note that in this approach, the shorter dataset will be used, in order to asses the discrepancies on variables’ lengths.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = train_netherlands_short ~ year + log_population_netherlands + 
+    log_gdp_capita_netherlands, data = netherlands_short_train_df)
+
+Residuals:
+     Min       1Q   Median       3Q      Max 
+-0.62498 -0.10859  0.03029  0.14217  0.40747 
+
+Coefficients:
+                           Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)                99.71010   26.26736   3.796 0.000421 ***
+year                       -0.03696    0.01201  -3.077 0.003481 ** 
+log_population_netherlands -1.44682    2.50368  -0.578 0.566105    
+log_gdp_capita_netherlands  0.26133    0.15213   1.718 0.092422 .  
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.1941 on 47 degrees of freedom
+Multiple R-squared:  0.8278,    Adjusted R-squared:  0.8168 
+F-statistic:  75.3 on 3 and 47 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+</div>
+<p>The multiple regression of <span class="math inline">\(\log(\text{deaths})\)</span> on year, <span class="math inline">\(\log(\text{population})\)</span>, and <span class="math inline">\(\log(\text{GDP per capita})\)</span> explains 81.68% of the variance (<span class="math inline">\(R^2 = 0.8168\)</span>) with a very small residual error (0.1941). Holding population and GDP constant, the coefficient for year is <span class="math inline">\(-0.0369\)</span>, indicating a significant annual decline in log‐deaths.</p>
+<p>Now, we need to check the residuals of the model.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-195-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Breusch-Godfrey test for serial correlation of order up to 10
+
+data:  Residuals
+LM test = 27.317, df = 10, p-value = 0.00232</code></pre>
+</div>
+</div>
+<p>In contrast with the simple regression, the residuals of the regression do not capture all the temporal structure. We need to further study the residuals.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-196-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-196-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-196-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-196-4.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF plot shows a spike at lag 1 followed by a gradual decay. The PACF plot exhibits a single dominant spike at lag 1 with all higher-lag partial autocorrelations inside the confidence boundaries. This pattern may suggest a more complex model for the residuals. We will study the ARMA(1,3).</p>
+<p>We fit this model on the residuals.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: complete_netherlands_residuals 
+ARIMA(2,1,2) 
+
+Coefficients:
+          ar1      ar2     ma1      ma2
+      -0.5457  -0.1329  0.3802  -0.4286
+s.e.   0.2989   0.3567  0.2899   0.3650
+
+sigma^2 = 0.02081:  log likelihood = 27.51
+AIC=-45.01   AICc=-43.65   BIC=-35.45
+
+Training set error measures:
+                      ME      RMSE       MAE       MPE     MAPE      MASE
+Training set -0.01361171 0.1370043 0.1060606 -35.45929 182.6485 0.8738164
+                    ACF1
+Training set -0.01261207</code></pre>
+</div>
+</div>
+<p>The low AIC value indicates a good fit. We check now the residuals:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-198-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(2,1,2)
+Q* = 2.8207, df = 6, p-value = 0.831
+
+Model df: 4.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arima_complete_netherlands_residuals)
+W = 0.98182, p-value = 0.6185</code></pre>
+</div>
+</div>
+<p>Now the residuals satisfy the necessary hypothesis. We begin the pronostics.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Time Series:
+Start = 52 
+End = 63 
+Frequency = 1 
+       1        2        3        4        5        6        7        8 
+51.30853 49.38895 47.39826 45.70524 41.99812 40.32394 39.07382 38.17130 
+       9       10       11       12 
+36.33198 34.67496 34.20467 32.25267 </code></pre>
+</div>
+</div>
+<p>Finally, let’s plot the new regression:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-200-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>                                                          Model        ME
+1 log(number_deaths) ~ year + log(population) + log(gdp_capita) -11.98604
+     RMSE       MPE      MAE     MAPE
+1 12.6848 -46.63588 11.98604 46.63588</code></pre>
+</div>
+</div>
+</section>
+</section>
+<section id="modeling-regressors-prediction" class="level3">
+<h3 class="anchored" data-anchor-id="modeling-regressors-prediction">Modeling regressors – prediction</h3>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-202-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We try to fix an ARIMA model using auto.arima()</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: ts(log(train_spain_df$population), start = 1951, frequency = 1) 
+ARIMA(4,1,0) with drift 
+
+Coefficients:
+         ar1      ar2     ar3      ar4   drift
+      1.6736  -1.2950  0.8903  -0.4208  0.0080
+s.e.  0.1196   0.2334  0.2429   0.1367  0.0011
+
+sigma^2 = 7.165e-06:  log likelihood = 308.67
+AIC=-605.34   AICc=-603.73   BIC=-592.88
+
+Training set error measures:
+                       ME        RMSE         MAE         MPE       MAPE
+Training set 0.0003003533 0.002539399 0.001111227 0.001756561 0.00639275
+                  MASE        ACF1
+Training set 0.1293403 -0.02464608</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-204-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(4,1,0) with drift
+Q* = 0.95998, df = 6, p-value = 0.9871
+
+Model df: 4.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_pop_spain)
+W = 0.49202, p-value = 4.264e-13</code></pre>
+</div>
+</div>
+<p>The residuals pass the Ljung-Box test, but not the normality test.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-205-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-206-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Now we do the same for gdp per capita.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-207-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>We try to fix an ARIMA model using auto.arima()</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+Call:
+lm(formula = log(spain_short_train_df$gdp_capita) ~ spain_short_train_df$year)
+
+Residuals:
+    Min      1Q  Median      3Q     Max 
+-0.4175 -0.2048 -0.1188  0.2535  0.5670 
+
+Coefficients:
+                            Estimate Std. Error t value Pr(&gt;|t|)    
+(Intercept)               -1.652e+02  5.469e+00  -30.22   &lt;2e-16 ***
+spain_short_train_df$year  8.758e-02  2.756e-03   31.79   &lt;2e-16 ***
+---
+Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+Residual standard error: 0.2812 on 48 degrees of freedom
+Multiple R-squared:  0.9546,    Adjusted R-squared:  0.9537 
+F-statistic:  1010 on 1 and 48 DF,  p-value: &lt; 2.2e-16</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-208-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Breusch-Godfrey test for serial correlation of order up to 10
+
+data:  Residuals
+LM test = 42.226, df = 10, p-value = 6.836e-06</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: residuals(lm(log(spain_short_train_df$gdp_capita) ~ spain_short_train_df$year)) 
+ARIMA(1,0,2) with zero mean 
+
+Coefficients:
+         ar1     ma1     ma2
+      0.7938  0.7108  0.3794
+s.e.  0.1077  0.1774  0.1550
+
+sigma^2 = 0.009345:  log likelihood = 46.03
+AIC=-84.05   AICc=-83.16   BIC=-76.4</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: ts(log(spain_short_train_df$gdp_capita), start = 1960, frequency = 1) 
+ARIMA(1,1,0) with drift 
+
+Coefficients:
+         ar1   drift
+      0.4424  0.0868
+s.e.  0.1304  0.0253
+
+sigma^2 = 0.01049:  log likelihood = 43.03
+AIC=-80.07   AICc=-79.53   BIC=-74.39
+
+Training set error measures:
+                        ME       RMSE        MAE        MPE      MAPE      MASE
+Training set -0.0003185579 0.09931388 0.07314049 0.02688485 0.8460412 0.6034643
+                   ACF1
+Training set 0.07293134</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-209-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(1,1,0) with drift
+Q* = 9.6767, df = 9, p-value = 0.3773
+
+Model df: 1.   Total lags used: 10</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_gdp_spain)
+W = 0.96578, p-value = 0.1551</code></pre>
+</div>
+</div>
+<p>The residuals pass the Ljung-Box test and the normality test.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-210-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-211-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
 </section>
 </section>
 

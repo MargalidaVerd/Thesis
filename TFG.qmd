@@ -427,7 +427,7 @@ As expected, the high $p$-value indicates that we fail to reject the null hypoth
 train_spain_diff <- train_spain %>% diff()
 
 
-plot_ts(train_spain) +
+plot_ts(train_spain_diff) +
   theme_minimal() +
   labs(
     title = "Differenced log-transformed time series",
@@ -816,6 +816,720 @@ Although ARIMA($0,2,1$) achieved the lowest numerical errors, its fitted traject
 
 In light of this discrepancy between numerical error metrics and visual fit, ARIMA($0,2,1$) does not adequately reproduce the sharp downturn observed in the test period. Therefore, despite its lower AIC and error measures, ARIMA($0,2,1$) is not optimal.
 
+### The Netherlands
+
+We study the Netherlands.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+train_netherlands <- ts(log(country_splits[["Netherlands"]]$train$number_deaths), start = 1950,  frequency = 1)
+
+p1 <- plot_ts(train_netherlands) +
+  theme_minimal() +
+  labs(
+    title = "Log-transformed time series",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+p2 <- plot_ts(ts(country_splits[["Netherlands"]]$train$number_deaths, start = 1950, frequency = 1)) +
+  theme_minimal() +
+  labs(
+    title = "Original time series",
+    x = "Year",
+    y = "Number of deaths"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+grid.arrange(p1,p2)
+
+```
+ACF and PACF fo the log-transformed series.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+acf(train_netherlands)
+pacf(train_netherlands)
+```
+ADF test to study stationarity.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+adf.test(train_netherlands)
+```
+
+The training series is not stationary.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+acf(train_netherlands %>% diff())
+pacf(train_netherlands %>% diff())
+```
+After apply a first order difference, the series ACF plot shows a significant spike at lag 4, and the PACF plot shows significant spikes at lags 4 and 7. We will begin studying the simplest model and the autogenerate model of auto.arima().
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+fit_netherlands_auto <- auto.arima(train_netherlands )
+summary(fit_netherlands_auto)
+```
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+fit_netherlands_auto %>% forecast:: checkresiduals()
+shapiro.test(residuals(fit_netherlands_auto))
+```
+
+The residuals for the autogenerate model do not satisfy the hypothesis.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_netherlands_413 <- fit_arima(4,1,3, "Netherlands", log_transform = TRUE)
+fit_netherlands_413
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+fit_netherlands_413 %>% forecast:: checkresiduals()
+shapiro.test(residuals(fit_netherlands_413))
+```
+On the contrary, the residuals of the 4,1,3 model pass both normality and Ljung-Box test.
+
+
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+forecast_netherlands_auto <- forecast(fit_netherlands_auto, level = c(95), h = get_length("Netherlands", "test", "number_deaths"), bootstrap = TRUE)
+
+forecast_netherlands_413 <- forecast(fit_netherlands_413, level = c(95), h = get_length("Netherlands", "test", "number_deaths"))
+
+forecast_netherlands_auto
+forecast_netherlands_413
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+autoplot(forecast_netherlands_auto) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Netherlands using ARIMA(0,1,0)",
+    subtitle = "95% confidence interval for forecasted values",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+
+
+autoplot(forecast_spain_auto) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in NEtherlands using ARIMA(0,1,0)",
+    subtitle = "Zoomed-in from 2000 to 2021",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  coord_cartesian(xlim = c(2000, max(time(forecast_spain_auto$mean)))) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+```
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+autoplot(forecast_netherlands_413) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Netherlands using ARIMA(4,1,3)",
+    subtitle = "95% confidence interval for forecasted values",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+
+```
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_netherlands <- country_splits[["Netherlands"]][["test"]]$number_deaths
+
+plot_netherlands_log_413 <- data.frame(
+  Year = seq_along(test_netherlands),
+  Actual = log(test_netherlands),
+  Predicted_413 = forecast_netherlands_413$mean
+)
+
+
+ggplot(plot_netherlands_log_413, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_413, color = "Predicted_413"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_413" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted TB deaths (logarithmic scale)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+We have seen that these models do not fit well the testing data. However, the ARIMA(4,1,3) seems to have cached some of the trend of the series. We propose to study a higher model, based on the ACF and PACF: an ARIMA(7,1,3).
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_netherlands_713 <- fit_arima(7,1,3, "Netherlands", log_transform = TRUE)
+fit_netherlands_713
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+
+forecast_netherlands_713 <- forecast(fit_netherlands_713, level = c(95), h = get_length("Netherlands", "test", "number_deaths"))
+
+forecast_netherlands_713
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+autoplot(forecast_netherlands_713) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Netherlands using ARIMA(7,1,3)",
+    subtitle = "95% confidence interval for forecasted values",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+
+```
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_netherlands <- country_splits[["Netherlands"]][["test"]]$number_deaths
+
+plot_netherlands_log_713 <- data.frame(
+  Year = seq_along(test_netherlands),
+  Actual = log(test_netherlands),
+  Predicted_713 = forecast_netherlands_713$mean
+)
+
+
+ggplot(plot_netherlands_log_713, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_713, color = "Predicted_713"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_713" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted TB deaths (logarithmic scale)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+**Final conclusions**
+
+Let's do a summary of the Netherlands models applied; we are going to change the scale into the original one.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_netherlands_real <- test_netherlands
+pred_netherlands_auto <- exp(forecast_netherlands_auto$mean)
+pred_neth_413 <- exp(forecast_netherlands_413$mean)
+pred_neth_713 <- exp(forecast_netherlands_713$mean)
+
+plot_netherlands <- data.frame(
+  Year = seq_along(test_netherlands_real),
+  Actual = test_netherlands_real,
+  Predicted_auto = pred_netherlands_auto,
+  Predicted_413 = pred_neth_413,
+  Predicted_713 = pred_neth_713
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+error_summary_netherlands <- data.frame(
+  Model = c("ARIMA(0,1,0)", "ARIMA(4,1,3)", "ARIMA(7,1,3)"),
+  ME = c(mean(test_netherlands_real - pred_netherlands_auto),
+         mean(test_netherlands_real - pred_neth_413),
+         mean(test_netherlands_real - pred_neth_713)),
+  
+  RMSE = c(rmse(test_netherlands_real, pred_netherlands_auto),
+           rmse(test_netherlands_real, pred_neth_413),
+           rmse(test_netherlands_real, pred_neth_713)),
+  
+  MPE = c(mean((test_netherlands_real - pred_netherlands_auto) / test_netherlands_real) * 100,
+          mean((test_netherlands_real - pred_neth_413) / test_netherlands_real) * 100,
+          mean((test_netherlands_real - pred_neth_713) / test_netherlands_real) * 100),
+  
+  MAE = c(mae(test_netherlands_real, pred_netherlands_auto),
+          mae(test_netherlands_real, pred_neth_413),
+          mae(test_netherlands_real, pred_neth_713)),
+  
+  MAPE = c(mape(test_netherlands_real, pred_netherlands_auto) * 100,
+           mape(test_netherlands_real, pred_neth_413) * 100,
+           mape(test_netherlands_real, pred_neth_713) * 100)
+)
+
+error_summary_netherlands
+
+```
+Among the three ARIMA specifications, the simplest model—ARIMA(0,1,0)—actually yields the lowest forecast errors on the original scale. It has an RMSE of 9.65 and an MAE of 8.91, with a MAPE of 33.60%, indicating that its predictions are off by roughly one‐third on average. In contrast, ARIMA(4,1,3) shows considerably higher error (RMSE = 12.95, MAE = 12.32, MAPE = 47.99%) and a larger overprediction bias (ME = –12.32, MPE = –47.99%), while ARIMA(7,1,3) falls between the two (RMSE = 12.06, MAE = 11.25, MAPE = 43.73%). Thus, despite its simplicity, ARIMA(0,1,0) best balances bias and precision for forecasting TB deaths in the Netherlands.
+
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+ggplot(plot_netherlands, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_auto, color = "Predicted_auto"), linetype = "dashed") +
+  geom_line(aes(y = Predicted_413, color = "Predicted_413"), linetype = "dashed") +
+  geom_line(aes(y = Predicted_713, color = "Predicted_713"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_auto" = "purple", "Predicted_413" = "red", "Predicted_713" = "green")) +
+  labs(title = "Actual vs Predicted TB Deaths",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+However, despite its lower numerical error metrics, the ARIMA(0,1,0) curve (purple dashed line) clearly fails to follow the actual year‐to‐year fluctuations in TB deaths. It smooths the decline too uniformly, missing the mid‐series uptick around test year 10 and exaggerating death counts early on. In contrast, both ARIMA(4,1,3) (red) and ARIMA(7,1,3) (green) better capture the changing slope and occasional rebounds, demonstrating that a slightly more complex ARIMA structure more faithfully reproduces the true dynamics.
+
+### Bulgaria
+
+Now, we study Bulgaria data. As seen in the introduction, Bulgaria has a different trend for number_deaths series. 
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+train_bulgaria <- ts(log(country_splits[["Bulgaria"]]$train$number_deaths), start = 1964, end = 2011,  frequency = 1)
+
+p1 <- plot_ts(train_bulgaria) +
+  theme_minimal() +
+  labs(
+    title = "Log-transformed time series",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+p2 <- plot_ts(ts(country_splits[["Bulgaria"]][["train"]]$number_deaths, start = 1964, frequency = 1)) +
+  theme_minimal() +
+  labs(
+    title = "Original time series",
+    x = "Year",
+    y = "Number of deaths"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    axis.text = element_text(size = 12),
+    axis.title = element_text(size = 13)
+  )
+
+grid.arrange(p1,p2)
+```
+We will work with the logarithmic data. We check both ACF and PACF plots:
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+acf(train_bulgaria)
+pacf(train_bulgaria)
+
+```
+The ACF shows an exponential decay, while the PACF shows a single significant spike at lag 1. This suggest an AR($1$) process. However, the series is not stationary (as seen in the plot, and justified by the ADF test, with a $p$-value of 0.05173).
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+adf.test(train_bulgaria)
+```
+
+Let's see which ARIMA order proposes the auto.arima() function.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_bulgaria_auto <- auto.arima(train_bulgaria)
+
+summary(fit_bulgaria_auto)
+```
+
+The model proposed is an ARIMA(0,1,0) with drift. We need to further study the residuals of the model.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_bulgaria_auto %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_bulgaria_auto))
+```
+The residuals seem to pass both Ljung-Box test and Shapiro-Wilk normality test. Now, we can forecast.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+forecasted_bulgaria_auto <- forecast(fit_bulgaria_auto, level = c(95), h= get_length("Bulgaria", "test", "number_deaths"))
+
+forecasted_bulgaria_auto
+
+```
+
+We can plot the results:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+autoplot(forecasted_bulgaria_auto) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Bulgaria using ARIMA(0,1,0)",
+    subtitle = "95% confidence interval for forecasted values",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+
+
+autoplot(forecasted_bulgaria_auto) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Bulgaria using ARIMA(0,1,0)",
+    subtitle = "Zoomed-in from 2000 to 2021",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  coord_cartesian(xlim = c(2000, max(time(forecast_spain_auto$mean)))) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+```
+Let's check the error measures of the test data:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_bulgaria <- log(country_splits[["Bulgaria"]][["test"]][["number_deaths"]])
+
+error_summary_bulgaria <- data.frame(
+  Model = "ARIMA(0,1,0)",
+  ME = mean(test_bulgaria - forecasted_bulgaria_auto$mean),
+  RMSE = rmse(test_bulgaria, forecasted_bulgaria_auto$mean),
+  MPE = mean((test_bulgaria - forecasted_bulgaria_auto$mean) / test_bulgaria) * 100,
+  MAE = mae(test_bulgaria, forecasted_bulgaria_auto$mean),
+  MAPE = mape(test_bulgaria, forecasted_bulgaria_auto$mean) * 100
+)
+
+error_summary_bulgaria
+```
+
+The ARIMA($0,1,0$) model yields a modest overprediction bias (ME = $–0.26$) and low forecast error (RMSE = $0.33$, MAE = $0.27$) on the log‐scale. Its MPE of $–5.96$% and MAPE of $6.12$% indicate that, on average, predictions are about 6% higher than actual values, reflecting a relatively accurate fit.
+
+Finally, we can plot the predicted values versus the real values, on the logarithmic scale.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+plot_bulgaria_log_010<- data.frame(
+  Year = seq_along(test_bulgaria),
+  Actual = test_bulgaria,
+  Predicted_010 = forecasted_bulgaria_auto$mean
+)
+
+
+ggplot(plot_bulgaria_log_010, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_010, color = "Predicted_010"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_010" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted TB deaths (logarithmic scale)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+
+The ARIMA(0,1,0) model does capture the overall downward trend, but as the plot shows, its forecasts remain too flat and consistently overestimate actual values. To improve accuracy, we will explore an AR(1) structure: the ACF/PACF of the series both suggest a significant lag‐1 dependence, so fitting ARIMA(1,1,0) may better track the curvature in the decline.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_bulgaria_110 <- Arima(train_bulgaria, order = c(1,1,0))
+
+summary(fit_bulgaria_110)
+```
+The AIC has a value of $-73.01$, meaning it could be a good fit. We check the residuals:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_bulgaria_110 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_bulgaria_110))
+```
+The residuals seem to pass both Ljung-Box test and Shapiro-Wilk normality test. Now, we can forecast.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+forecasted_bulgaria_110 <- forecast(fit_bulgaria_110, level = c(95), h= get_length("Bulgaria", "test", "number_deaths"))
+
+forecasted_bulgaria_110
+
+```
+
+We can plot the results:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+autoplot(forecasted_bulgaria_110) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Bulgaria using ARIMA(1,1,0)",
+    subtitle = "95% confidence interval for forecasted values",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+
+
+autoplot(forecasted_bulgaria_110) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Bulgaria using ARIMA(1,1,0)",
+    subtitle = "Zoomed-in from 2000 to 2021",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  coord_cartesian(xlim = c(2000, max(time(forecasted_bulgaria_110$mean)))) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+```
+Let's check the error measures of the logarithmic test data:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_bulgaria <- log(country_splits[["Bulgaria"]][["test"]][["number_deaths"]])
+
+error_summary_bulgaria <- data.frame(
+  Model = "ARIMA(1,1,0)",
+  ME = mean(test_bulgaria - forecasted_bulgaria_110$mean),
+  RMSE = rmse(test_bulgaria, forecasted_bulgaria_110$mean),
+  MPE = mean((test_bulgaria - forecasted_bulgaria_110$mean) / test_spain) * 100,
+  MAE = mae(test_bulgaria, forecasted_bulgaria_110$mean),
+  MAPE = mape(test_bulgaria, forecasted_bulgaria_110$mean) * 100
+)
+
+error_summary_bulgaria
+```
+
+The ARIMA($1,1,0$) fit still shows a slight overprediction bias (ME = –0.45) but achieves a lower RMSE (0.55) and MAE (0.45) than the (0,1,0) model. Its MPE of –8.33% and MAPE of 10.29% indicate that forecasts now overshoot actual log‐deaths by about 8%, yielding around a 10% average percentage error—an improvement over the simpler differenced‐white‐noise model.
+
+Finally, we can plot the predicted values versus the real values, on the logarithmic scale.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+plot_bulgaria_log_110 <- data.frame(
+  Year = seq_along(test_bulgaria),
+  Actual = test_bulgaria,
+  Predicted_110 = forecasted_bulgaria_110$mean
+)
+
+
+ggplot(plot_bulgaria_log_110, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_110, color = "Predicted_110"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_110" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted TB deaths (logarithmic scale)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+Even with the ARIMA($1,1,0$) specification, the model still fails to track the path of actual values. To address this, we will employ our `try_all_arima` routine to explore higher‐order combinations of $p$, $d$, and $q$ and identify a more flexible ARIMA structure.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+ar_coef = c(2,3)
+d_coef = c(0,1)
+ma_coef = c(2,3)
+
+try_all_arima(ar_coef, d_coef, ma_coef, train_bulgaria)
+
+```
+The best model, based on the AIC criterion is an ARIMA($2,1,3$). Let's fit this model:
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+fit_bulgaria_213 <- fit_arima(2,1,3, "Bulgaria", log_transform = TRUE)
+summary(fit_bulgaria_213)
+```
+
+Let's check the residuals:
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+fit_bulgaria_213 %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_bulgaria_213))
+```
+
+The residuals pass both Ljung-Box and normality test. Now, we can forecast:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+forecasted_bulgaria_213 <- forecast(fit_bulgaria_213, level = c(95), h= get_length("Bulgaria", "test", "number_deaths"))
+
+forecasted_bulgaria_213
+
+```
+
+We can plot the results:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+autoplot(forecasted_bulgaria_213) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Bulgaria using ARIMA(2,1,3)",
+    subtitle = "95% confidence interval for forecasted values",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+
+```
+Let's check the error measures of the test data:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_bulgaria <- log(country_splits[["Bulgaria"]][["test"]][["number_deaths"]])
+
+error_summary_bulgaria <- data.frame(
+  Model = "ARIMA(2,1,3)",
+  ME = mean(test_bulgaria - forecasted_bulgaria_213$mean),
+  RMSE = rmse(test_bulgaria, forecasted_bulgaria_213$mean),
+  MPE = mean((test_bulgaria - forecasted_bulgaria_213$mean) / test_bulgaria) * 100,
+  MAE = mae(test_bulgaria, forecasted_bulgaria_213$mean),
+  MAPE = mape(test_bulgaria, forecasted_bulgaria_213$mean) * 100
+)
+
+error_summary_bulgaria
+```
+
+The ARIMA($2,1,3$) model shows a modest overprediction bias (ME = –0.30) and improved overall accuracy (RMSE = 0.43, MAE = 0.32) compared to lower‐order specifications. Its MPE of –6.89% and MAPE of 7.42% indicate that forecasts tend to overshoot by roughly 6.9%, with an average percentage error of about 7.4%, reflecting a noticeably tighter fit to the observed log‐deaths series.
+
+Finally, we can plot the predicted values versus the real values, on the logarithmic scale.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+plot_bulgaria_log_213 <- data.frame(
+  Year = seq_along(test_bulgaria),
+  Actual = test_bulgaria,
+  Predicted_213 = forecasted_bulgaria_213$mean
+)
+
+
+ggplot(plot_bulgaria_log_213, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_213, color = "Predicted_213"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_213" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted TB deaths (logarithmic scale)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+
+**Final conclusions**
+
+Let's do a summary of the Bulgarian models applied; we are going to change the scale into the original one.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_bulgaria_real <- exp(test_bulgaria)
+pred_bulgaria_auto <- exp(forecasted_bulgaria_auto$mean)
+pred_bulgaria_110 <- exp(forecasted_bulgaria_110$mean)
+pred_bulgaria_213 <- exp(forecasted_bulgaria_213$mean)
+
+plot_bulgaria <- data.frame(
+  Year = seq_along(test_bulgaria_real),
+  Actual = test_bulgaria_real,
+  Predicted_auto = pred_bulgaria_auto,
+  Predicted_110 = pred_bulgaria_110,
+  Predicted_213 = pred_bulgaria_213
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+error_summary_bulgaria <- data.frame(
+  Model = c("ARIMA(0,1,0)", "ARIMA(1,1,0)", "ARIMA(2,1,3)"),
+  ME = c(mean(test_bulgaria_real - pred_bulgaria_auto),
+         mean(test_bulgaria_real - pred_bulgaria_110),
+         mean(test_bulgaria_real - pred_bulgaria_213)),
+  
+  RMSE = c(rmse(test_bulgaria_real, pred_bulgaria_auto),
+           rmse(test_bulgaria_real, pred_bulgaria_110),
+           rmse(test_bulgaria_real, pred_bulgaria_213)),
+  
+  MPE = c(mean((test_bulgaria_real - pred_bulgaria_auto) / test_bulgaria_real) * 100,
+          mean((test_bulgaria_real - pred_bulgaria_110) / test_bulgaria_real) * 100,
+          mean((test_bulgaria_real - pred_bulgaria_213) / test_bulgaria_real) * 100),
+  
+  MAE = c(mae(test_bulgaria_real, pred_bulgaria_auto),
+          mae(test_bulgaria_real, pred_bulgaria_110),
+          mae(test_bulgaria_real, pred_bulgaria_213)),
+  
+  MAPE = c(mape(test_bulgaria_real, pred_bulgaria_auto) * 100,
+           mape(test_bulgaria_real, pred_bulgaria_110) * 100,
+           mape(test_bulgaria_real, pred_bulgaria_213) * 100)
+)
+
+error_summary_bulgaria
+
+```
+Among the three candidates, ARIMA(0,1,0) delivers the best out‐of‐sample performance, with the lowest RMSE (32.09), MAE (28.32), and MAPE (33.61%), despite a moderate overestimation bias (ME = –26.97, MPE = –32.80%). In contrast, ARIMA(1,1,0) exhibits much larger forecast errors (RMSE = 62.47, MAE = 54.76, MAPE = 65.34%), and ARIMA(2,1,3) sits in between (RMSE = 43.22, MAE = 35.29, MAPE = 44.07%). Thus, the simple differenced‐white‐noise model (0,1,0) most consistently tracks actual TB‐death counts on the original scale.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+ggplot(plot_bulgaria, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_auto, color = "Predicted_auto"), linetype = "dashed") +
+  geom_line(aes(y = Predicted_110, color = "Predicted_110"), linetype = "dashed") +
+  geom_line(aes(y = Predicted_213, color = "Predicted_213"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_auto" = "purple", "Predicted_110" = "red", "Predicted_213" = "green")) +
+  labs(title = "Actual vs Predicted TB Deaths",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
 
 ## ARIMAX models
 
@@ -1293,6 +2007,670 @@ ggplot(plot_spain_arimax, aes(x = Year)) +
        color = "Legend") +
   theme_minimal()
 ```
+### The Netherlands
+
+Let's continue with the Netherlands.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+df_netherlands_arimax_plot <- data.frame(
+  Year = countries_short[["Netherlands"]][["full"]]$year,
+  number_deaths = countries_short[["Netherlands"]][["full"]]$number_deaths,
+  population = countries_short[["Netherlands"]][["full"]]$population,
+  gdp_capita = countries_short[["Netherlands"]][["full"]]$gdp_capita
+)
+
+
+ggplot(df_netherlands_arimax_plot, aes(x = Year)) +
+  geom_line(aes(y = number_deaths, color = "number_deaths")) +
+  geom_line(aes(y = population/10000, color = "population")) +
+  geom_line(aes(y = gdp_capita/1000, color = "gdp_capita")) +
+  scale_color_manual(values = c("number_deaths" = "#1f77b4", "population" = "purple", "gdp_capita" = "red")) +
+  labs(title = "The Netherlands",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+
+
+ggplot(df_netherlands_arimax_plot, aes(x = Year)) +
+  geom_line(aes(y = log(number_deaths), color = "number_deaths")) +
+  geom_line(aes(y = log(population), color = "population")) +
+  geom_line(aes(y = log(gdp_capita), color = "gdp_capita")) +
+  scale_color_manual(values = c("number_deaths" = "#1f77b4", "population" = "purple", "gdp_capita" = "red")) +
+  labs(title = "The Netherlands",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+
+```
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+countries_short[["Netherlands"]][["train"]]
+train_netherlands_short <- ts(log(countries_short[["Netherlands"]][["train"]][["number_deaths"]]), start = 1960, frequency = 1)
+
+xreg_netherlands_train <- data.frame(
+  population = ts(log(countries_short[["Netherlands"]][["train"]][["population"]]), start = 1960, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Netherlands"]][["train"]][["gdp_capita"]]), start = 1960, frequency = 1)
+)
+
+
+fit_arimax_netherlands <- auto.arima(train_netherlands_short, xreg= as.matrix(xreg_netherlands_train ))
+
+summary(fit_arimax_netherlands)
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arimax_netherlands %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arimax_netherlands))
+```
+
+The residuals of the ARIMAX model satisfy both normality and non autocorrelation hypothesis. Now, we begin the forecast:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+countries_short[["Netherlands"]][["test"]]
+test_netherlands_short <- ts(log(countries_short[["Netherlands"]][["test"]][["number_deaths"]]), start = 2011, frequency = 1)
+
+xreg_netherlands_test <- data.frame(
+  population = ts(log(countries_short[["Netherlands"]][["test"]][["population"]]), start = 2011, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Netherlands"]][["test"]][["gdp_capita"]]), start = 2011, frequency = 1)
+)
+
+forecastx_netherlands_auto <- forecast(fit_arimax_netherlands, level = c(95), h = length(test_lengths_per_country_short[["Netherlands"]]), xreg = as.matrix(xreg_netherlands_test))
+
+forecastx_netherlands_auto
+```
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+autoplot(forecastx_netherlands_auto) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in the Netherlands using ARIMAX(1,0,3)",
+    subtitle = "95% confidence interval for forecasted values",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+
+
+autoplot(forecastx_netherlands_auto) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in the Netherlands using ARIMA(1,0,3)",
+    subtitle = "Zoomed-in from 2000 to 2021",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  coord_cartesian(xlim = c(2000, 2021)) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+```
+Let's plot the predicted versus the actual logarithmic values:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+plot_netherlands_log_auto <- data.frame(
+  Year = seq_along(test_netherlands_short),
+  Actual = test_netherlands_short,
+  Predicted_arimax = forecastx_netherlands_auto$mean
+)
+
+
+ggplot(plot_netherlands_log_auto, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_arimax, color = "Predicted_arimax"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_arimax" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted TB deaths (logarithmic scale)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+Finally, we can check the error measures in order to analyze the accuracy of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+error_summary <- data.frame(
+  Model = "ARIMAX(1,0,3)",
+  ME = mean(test_netherlands_short - forecastx_netherlands_auto$mean),
+  RMSE = rmse(test_netherlands_short ,forecastx_netherlands_auto$mean),
+  MPE = mean((test_netherlands_short - forecastx_netherlands_auto$mean) / test_netherlands_short) * 100,
+  MAE = mae(test_netherlands_short, forecastx_netherlands_auto$mean),
+  MAPE = mape(test_netherlands_short ,forecastx_netherlands_auto$mean) * 100
+)
+
+
+error_summary
+```
+
+The ARIMAX(1,0,3) model yields an ME of –0.66 and an RMSE of 0.70 on the log‐scale, indicating a modest overprediction bias and moderate overall error. Its MPE of –20.53% and MAPE of 20.53% show that predicted values typically exceed actual deaths by around 20% on average, reflecting a reasonably accurate but slightly optimistic fit.
+
+Now, let's try to adjust another ARIMAX model, just to try to improve the error measures. The auto.arima() function does not apply any difference to the series; let's check the stationarity of the three series.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+adf.test(train_netherlands_short)
+
+adf.test(train_netherlands_short %>% diff())
+```
+
+Yet the series is not stationary, when we apply a first order difference it passes the ADF test of stationarity. We an plot the ACf and PACF.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+acf(train_netherlands_short %>% diff())
+pacf(train_netherlands_short %>% diff())
+```
+Both the ACF and PACF show a significant spike at lag 2. 
+
+Now, we difference the other series.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+adf.test(xreg_netherlands_train$population %>% diff(differences = 2))
+adf.test(xreg_netherlands_train$gdp_capita %>% diff(differences = 2))
+
+acf(xreg_netherlands_train$population %>% diff(differences = 2))
+pacf(xreg_netherlands_train$population %>% diff(differences = 2))
+
+```
+
+```{r}
+fit_arimax_netherlands_222 <- Arima(train_netherlands_short, order = c(2,2,2), xreg = as.matrix(xreg_netherlands_train))
+summary(fit_arimax_netherlands_222)
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arimax_netherlands_222 %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arimax_netherlands_222))
+```
+
+The residuals of the ARIMAX model satisfy both normality and non autocorrelation hypothesis. Now, we begin the forecast:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+forecastx_netherlands_222 <- forecast(fit_arimax_netherlands_222, level = c(95), h = length(test_lengths_per_country_short[["Netherlands"]]), xreg = as.matrix(xreg_netherlands_test))
+
+forecastx_netherlands_222
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+autoplot(forecastx_netherlands_222) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in the Netherlands using ARIMAX(2,2,2)",
+    subtitle = "95% confidence interval for forecasted values",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+
+
+autoplot(forecastx_netherlands_222) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in the Netherlands using ARIMA(2,2,2)",
+    subtitle = "Zoomed-in from 2000 to 2021",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  coord_cartesian(xlim = c(2000, 2021)) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+```
+
+Let's plot the predicted versus the actual logarithmic values:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+plot_netherlands_log_222 <- data.frame(
+  Year = seq_along(test_netherlands_short),
+  Actual = test_netherlands_short,
+  Predicted_arimax = forecastx_netherlands_222$mean
+)
+
+
+ggplot(plot_netherlands_log_222, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_arimax, color = "Predicted_arimax"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_arimax" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted TB deaths (logarithmic scale)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+Finally, we can check the error measures in order to analyze the accuracy of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+error_summary <- data.frame(
+  Model = "ARIMAX(2,2,2)",
+  ME = mean(test_netherlands_short - forecastx_netherlands_222$mean),
+  RMSE = rmse(test_netherlands_short ,forecastx_netherlands_222$mean),
+  MPE = mean((test_netherlands_short - forecastx_netherlands_222$mean) / test_netherlands_short) * 100,
+  MAE = mae(test_netherlands_short, forecastx_netherlands_222$mean),
+  MAPE = mape(test_netherlands_short ,forecastx_netherlands_222$mean) * 100
+)
+
+
+error_summary
+```
+
+**Final conclusions**
+
+Let's do a summary of the Netherlands models applied; we are going to change the scale into the original one.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_netherlands_real_short <- exp(test_netherlands_short)
+predx_netherlands_auto <- exp(forecastx_netherlands_auto$mean)
+predx_netherlands_222 <- exp(forecastx_netherlands_222$mean)
+
+
+plot_netherlands_arimax <- data.frame(
+  Year = seq_along(test_netherlands_real_short),
+  Actual = test_netherlands_real_short,
+  Predicted_auto= predx_netherlands_auto,
+  Predicted_222 = predx_netherlands_222
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+arimax_error_summary_netherlands <- data.frame(
+  Model = c("ARIMA(1,0,3)", "ARIMA(2,2,2)"),
+  ME = c(mean(test_netherlands_real_short - predx_netherlands_auto),
+         mean(test_netherlands_real_short - predx_netherlands_222)),
+  
+  RMSE = c(rmse(test_netherlands_real_short, predx_netherlands_auto),
+           rmse(test_netherlands_real_short, predx_netherlands_222)),
+  
+  MPE = c(mean((test_netherlands_real_short - predx_netherlands_auto) / test_netherlands_real_short) * 100,
+          mean((test_netherlands_real_short - predx_netherlands_222) / test_netherlands_real_short) * 100),
+  
+  MAE = c(mae(test_netherlands_real_short, predx_netherlands_auto),
+          mae(test_netherlands_real_short, predx_netherlands_222)),
+  
+  MAPE = c(mape(test_netherlands_real_short, predx_netherlands_auto) * 100,
+           mape(test_netherlands_real_short, predx_netherlands_222) * 100)
+)
+
+arimax_error_summary_netherlands
+
+```
+
+
+
+Finally, we plot both approaches for the test set.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+ggplot(plot_netherlands_arimax, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_auto, color = "Predicted_auto"), linetype = "dashed") +
+  geom_line(aes(y = Predicted_222, color = "Predicted_222"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_auto" = "purple", "Predicted_222" = "red")) +
+  labs(title = "Actual vs Predicted TB Deaths",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+
+
+### Bulgaria
+
+Now, we study the Bulgarian time series. We begin, as in Spain, by studying the regressor variables.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+df_bulgaria_arimax_plot <- data.frame(
+  Year = countries_short[["Bulgaria"]][["full"]]$year,
+  number_deaths = countries_short[["Bulgaria"]][["full"]]$number_deaths,
+  population = countries_short[["Bulgaria"]][["full"]]$population,
+  gdp_capita = countries_short[["Bulgaria"]][["full"]]$gdp_capita
+)
+
+
+ggplot(df_bulgaria_arimax_plot, aes(x = Year)) +
+  geom_line(aes(y = number_deaths, color = "number_deaths")) +
+  geom_line(aes(y = population/10000, color = "population")) +
+  geom_line(aes(y = gdp_capita, color = "gdp_capita")) +
+  scale_color_manual(values = c("number_deaths" = "#1f77b4", "population" = "purple", "gdp_capita" = "red")) +
+  labs(title = "Bulgaria",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+
+
+ggplot(df_bulgaria_arimax_plot, aes(x = Year)) +
+  geom_line(aes(y = log(number_deaths), color = "number_deaths")) +
+  geom_line(aes(y = log(population), color = "population")) +
+  geom_line(aes(y = log(gdp_capita), color = "gdp_capita")) +
+  scale_color_manual(values = c("number_deaths" = "#1f77b4", "population" = "purple", "gdp_capita" = "red")) +
+  labs(title = "Bulgaria",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+countries_short[["Bulgaria"]][["train"]]
+train_bulgaria_short <- ts(log(countries_short[["Bulgaria"]][["train"]][["number_deaths"]]), start = 1980, frequency = 1)
+
+xreg_bulgaria_train <- data.frame(
+  population = ts(log(countries_short[["Bulgaria"]][["train"]][["population"]]), start = 1980, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Bulgaria"]][["train"]][["gdp_capita"]]), start = 1980, frequency = 1)
+)
+
+
+fit_arimax_bulgaria <- auto.arima(train_bulgaria_short, xreg= as.matrix(xreg_bulgaria_train ))
+
+summary(fit_arimax_bulgaria)
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arimax_bulgaria %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arimax_bulgaria))
+```
+
+The residuals of the ARIMAX model satisfy both normality and non autocorrelation hypothesis. Now, we begin the forecast:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+countries_short[["Bulgaria"]][["test"]]
+test_bulgaria_short <- ts(log(countries_short[["Bulgaria"]][["test"]][["number_deaths"]]), start = 2014, frequency = 1)
+
+xreg_bulgaria_test <- data.frame(
+  population = ts(log(countries_short[["Bulgaria"]][["test"]][["population"]]), start = 2014, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Bulgaria"]][["test"]][["gdp_capita"]]), start = 2014, frequency = 1)
+)
+
+forecastx_bulgaria_100 <- forecast(fit_arimax_bulgaria, level = c(95), h = length(test_lengths_per_country_short[["Bulgaria"]]), xreg = as.matrix(xreg_bulgaria_test))
+
+forecastx_bulgaria_100
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+autoplot(forecastx_bulgaria_100) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Bulgaria using ARIMAX(1,0,0)",
+    subtitle = "95% confidence interval for forecasted values",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+
+
+autoplot(forecastx_bulgaria_100) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Bulgaria using ARIMA(1,0,0)",
+    subtitle = "Zoomed-in from 2000 to 2021",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  coord_cartesian(xlim = c(2000, 2021)) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+```
+
+Let's plot the predicted versus the actual logarithmic values:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+plot_bulgaria_log_100 <- data.frame(
+  Year = seq_along(test_bulgaria_short),
+  Actual = test_bulgaria_short,
+  Predicted_arimax = forecastx_bulgaria_100$mean
+)
+
+
+ggplot(plot_bulgaria_log_100, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_arimax, color = "Predicted_arimax"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_arimax" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted TB deaths (logarithmic scale)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+Finally, we can check the error measures in order to analyze the accuracy of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+error_summary <- data.frame(
+  Model = "ARIMAX(1,0,0)",
+  ME = mean(test_bulgaria_short - forecastx_bulgaria_100$mean),
+  RMSE = rmse(test_bulgaria_short ,forecastx_bulgaria_100$mean),
+  MPE = mean((test_bulgaria_short - forecastx_bulgaria_100$mean) / test_bulgaria_short) * 100,
+  MAE = mae(test_bulgaria_short, forecastx_bulgaria_100$mean),
+  MAPE = mape(test_bulgaria_short ,forecastx_bulgaria_100$mean) * 100
+)
+
+
+error_summary
+```
+The ARIMAX($1,0,0$) model shows a modest overprediction bias (ME = –0.59) and a moderate overall error (RMSE = 0.65, MAE = 0.59) on the log scale. Its MPE of –13.32% and MAPE of 13.32% indicate that forecasts typically exceed actual values by about 13%, reflecting reasonable fit but still room for improvement.
+
+As we see in the plot, the auto.arima function has not fully capture the structure of the series. Let's try to adjust manually another ARIMAX model. First, we need to check if the time series are stationary in the lof-transformed scale.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+adf.test(train_bulgaria_short)
+```
+
+The main series is not stationary. We difference this series.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+train_bulgaria_short_diff <- train_bulgaria_short %>% diff()
+
+acf(train_bulgaria_short_diff)
+pacf(train_bulgaria_short_diff)
+```
+The ACF and PACF plots do not show any significant spikes after differencing once the series.
+
+Next, we difference the log(populatioin) time series over the same short training period:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+population_bulgaria_diff <- ts(log(countries_short[["Bulgaria"]][["train"]][["population"]]), start = 1980, frequency = 1) %>% diff()
+
+acf(population_bulgaria_diff)
+pacf(population_bulgaria_diff)
+```
+The ACF plot shows a slow exponential decay over the first few lags. In contrast, the PACF shows two large spikes at lags 1 and 2, and then subsequent lags are essentially within the confidence bounds. This pattern is characteristic of an AR($2$) process. 
+
+Finally, we difference the log(gdp_capita) series:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+gdp_capita_bulgaria_diff <- ts(log(countries_short[["Bulgaria"]][["train"]][["gdp_capita"]]), start = 1980, frequency = 1) %>% diff()
+
+acf(gdp_capita_bulgaria_diff)
+pacf(gdp_capita_bulgaria_diff)
+```
+It is noticeable that both ACF and PACF show a single spike at lag 4. This pattern may suggest a high MA component for this series.
+
+Putting all together, we propose the ARIMA($1,1,1$).
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+fit_arimax_bulgaria_111 <- Arima(train_bulgaria_short, order = c(1,1,1), xreg = as.matrix(xreg_bulgaria_train))
+fit_arimax_bulgaria_111
+```
+The value of the AIC ($-50.02$) indicates a well-suited fit. Now, we need to check the residuals:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arimax_bulgaria_111 %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arimax_bulgaria_111))
+```
+
+The model's residuals pass both normality and Ljung-Box tests. Now, we do the forecast.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+forecastx_bulgaria_111 <- forecast(fit_arimax_bulgaria_111, level = c(95), h = length(test_lengths_per_country_short[["Bulgaria"]]), xreg = as.matrix(xreg_bulgaria_test))
+
+forecastx_bulgaria_111
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+autoplot(forecastx_bulgaria_111) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Bulgaria using ARIMAX(1,1,1)",
+    subtitle = "95% confidence interval for forecasted values",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+
+
+autoplot(forecastx_bulgaria_111) +
+  theme_minimal() +
+  labs(
+    title = "Forecast of TB deaths in Bulgaria using ARIMA(1,1,1)",
+    subtitle = "Zoomed-in from 2000 to 2021",
+    x = "Year",
+    y = "Log(Number of deaths)"
+  ) +
+  coord_cartesian(xlim = c(2000, 2021)) +
+  theme(
+    plot.title = element_text(face = "bold", size = 16),
+    plot.subtitle = element_text(size = 13),
+    axis.text = element_text(size = 11),
+    axis.title = element_text(size = 12)
+  )
+```
+Let's plot the predicted versus the actual logarithmic values:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+plot_bulgaria_log_111 <- data.frame(
+  Year = seq_along(test_bulgaria_short),
+  Actual = test_bulgaria_short,
+  Predicted_arimax = forecastx_bulgaria_111$mean
+)
+
+
+ggplot(plot_bulgaria_log_111, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_arimax, color = "Predicted_arimax"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_arimax" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted TB deaths (logarithmic scale)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
+Finally, we can check the error measures in order to analyze the accuracy of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+error_summary <- data.frame(
+  Model = "ARIMAX(1,1,1)",
+  ME = mean(test_bulgaria_short - forecastx_bulgaria_111$mean),
+  RMSE = rmse(test_bulgaria_short ,forecastx_bulgaria_111$mean),
+  MPE = mean((test_bulgaria_short - forecastx_bulgaria_111$mean) / test_bulgaria_short) * 100,
+  MAE = mae(test_bulgaria_short, forecastx_bulgaria_111$mean),
+  MAPE = mape(test_bulgaria_short ,forecastx_bulgaria_111$mean) * 100
+)
+
+
+error_summary
+```
+The ARIMAX($1,1,1$) model reduces bias (ME ≈ –0.38) and yields an RMSE of 0.44 on the log‐scale, corresponding to about 8.7% average percentage error (MAPE). These results suggest that including both AR(1) and MA(1) terms alongside population and GDP significantly improves fit over simpler specifications, though there remains a small tendency to overpredict.
+
+**Final conclusions**
+
+Let's do a summary of the Bulgarian models applied; we are going to change the scale into the original one.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_bulgaria_real_short <- exp(test_bulgaria_short)
+predx_bulgaria_auto <- exp(forecastx_bulgaria_100$mean)
+predx_bulgaria_111 <- exp(forecastx_bulgaria_111$mean)
+
+
+plot_bulgaria_arimax <- data.frame(
+  Year = seq_along(test_bulgaria_real_short),
+  Actual = test_bulgaria_real_short,
+  Predicted_auto= predx_bulgaria_auto,
+  Predicted_111 = predx_bulgaria_111
+)
+
+```
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+arimax_error_summary_bulgaria <- data.frame(
+  Model = c("ARIMA(1,0,0)", "ARIMA(1,1,1)"),
+  ME = c(mean(test_bulgaria_real_short - predx_bulgaria_auto),
+         mean(test_bulgaria_real_short - predx_bulgaria_111)),
+  
+  RMSE = c(rmse(test_bulgaria_real_short, predx_bulgaria_auto),
+           rmse(test_bulgaria_real_short, predx_bulgaria_111)),
+  
+  MPE = c(mean((test_bulgaria_real_short - predx_bulgaria_auto) / test_bulgaria_real_short) * 100,
+          mean((test_bulgaria_real_short - predx_bulgaria_111) / test_bulgaria_real_short) * 100),
+  
+  MAE = c(mae(test_bulgaria_real_short, predx_bulgaria_auto),
+          mae(test_bulgaria_real_short, predx_bulgaria_111)),
+  
+  MAPE = c(mape(test_bulgaria_real_short, predx_bulgaria_auto) * 100,
+           mape(test_bulgaria_real_short, predx_bulgaria_111) * 100)
+)
+
+arimax_error_summary_bulgaria
+
+```
+
+Comparing the two ARIMA models on the orginal scale, ARIMA($1,1,1$) clearly outperforms ARIMA($1,0,0$). The ARIMA(1,1,1) model cuts RMSE nearly in half (43.88 vs. 76.28) and reduces MAE from 71.58 to 40.61. In percentage terms, its MAPE of 50.28% is substantially better than 87.34% for ARIMA(1,0,0). Both models slightly overpredict (negative ME/MPE), but ARIMA(1,1,1) exhibits much lower bias (ME = –40.61 vs. –71.58). In short, adding one difference and an MA(1) term yields a markedly more accurate fit.
+
+Finally, we plot both approaches for the test set.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+ggplot(plot_bulgaria_arimax, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted_auto, color = "Predicted_auto"), linetype = "dashed") +
+  geom_line(aes(y = Predicted_111, color = "Predicted_111"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted_auto" = "purple", "Predicted_111" = "red")) +
+  labs(title = "Actual vs Predicted TB Deaths",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+```
 
 
 ## Logarithmic regression
@@ -1303,7 +2681,7 @@ We have proved that ARIMA and ARIMAX models do not fit well the time series. The
 
 #### Simple regression
 
-In this first regression, we will use the complete data, not the shorter ones. 
+In this first regression, we will use the complete data, not the shorter one. 
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
@@ -1519,7 +2897,7 @@ ggplot(plot_complete_spain, aes(x = Year)) +
   ) +
   labs(
     title    = "Actual vs. Forecast TB Deaths (Trend + Pop + GDP)",
-    subtitle = "Modelo completo: log_deaths ~ year + log_population + log_gdp + ARMA(1,0)",
+    subtitle = "Model: log_deaths ~ year + log_population + log_gdp + ARMA(1,0)",
     x        = "Year (Test Set: 2001–2010)",
     y        = "Number of Deaths",
     color    = "Series"
@@ -1537,33 +2915,655 @@ ggplot(plot_complete_spain, aes(x = Year)) +
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
-actual_deaths <- df_test$number_deaths
-
-# 7.2. Calcular métricas para el modelo “FULL”
-ME_full   <- mean(actual_deaths - deaths_forecast_full)
-RMSE_full <- rmse(actual_deaths, deaths_forecast_full)
-MAE_full  <- mae(actual_deaths, deaths_forecast_full)
-MPE_full  <- mean((actual_deaths - deaths_forecast_full) / actual_deaths) * 100
-MAPE_full <- mean(abs((actual_deaths - deaths_forecast_full) / actual_deaths)) * 100
-
-results_full <- data.frame(
-  Model = "Trend + ARMA (Full)",
-  ME    = ME_full,
-  RMSE  = RMSE_full,
-  MAE   = MAE_full,
-  MPE   = MPE_full,
-  MAPE  = MAPE_full
+error_summary_complete_spain <- data.frame(
+  Model = "log(number_deaths) ~ year + log(population) + log(gdp_capita)",
+  ME = mean(actual_spain - forecast_complete_spain),
+  RMSE = rmse(actual_spain, forecast_complete_spain),
+  MPE = mean((actual_spain - forecast_complete_spain) / actual_spain) * 100,
+  MAE = mae(actual_spain, forecast_complete_spain),
+  MAPE = mape(actual_spain, forecast_complete_spain) * 100
 )
 
-print(results_full)
+error_summary_complete_spain
+```
 
-# ------------------------------------------------
-# 8. GRAFICAR “ACTUAL vs. PRONÓSTICO (FULL)”
-# ------------------------------------------------
+### Bulgaria
+
+#### Simple regression
+
+In this first regression, we will use the complete data, not the shorter one. 
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+train_bulgaria_df <- country_splits[["Bulgaria"]][["train"]] 
+country_splits[["Bulgaria"]][["train"]] 
+
+lm_trend_simple_bulgaria <- lm(train_bulgaria ~ year, data = train_bulgaria_df)
+summary(lm_trend_simple_bulgaria)
+
+```
+
+The linear regression of log(number_deaths) on year yields an intercept of 71.57 and a slope of –0.033 (both highly significant, $p<2\mathrm{e}{-16}$), indicating a strong, steady annual decline in log‐deaths. The model explains 98.07% of the variance ($R^2=0.9807$), with residuals showing a low standard error (0.1626), confirming an excellent fit during 1960–2000.
+
+Now, we need to further study the residuals of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+lm_trend_simple_bulgaria %>% forecast::checkresiduals()
+
+simple_bulgaria_residuals <- ts(residuals(lm_trend_simple_bulgaria), start = 1980, frequency = 1)
+
+```
+
+As we see in the plot, the model has not fully capture the structure of the series, meaning we will need to determine an ARIMA structure for the residuals. We begin by plotting the ACF and PACF.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+acf(simple_bulgaria_residuals)
+pacf(simple_bulgaria_residuals)
+
+```
+The ACF plot shows an exponential decaying trend, whereas the PACF shows a significant spike at lag 1. This pattern may suggest an AR($1$) component for the residuals.
+
+Let's fit an ARMA($1,0$).
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+fit_arima_simple_bulgaria_residuals <- Arima(simple_bulgaria_residuals, order = c(1, 0, 0))
+summary(fit_arima_simple_bulgaria_residuals)
+```
+
+It seems a well-fitted model (AIC value of $-77.76$). Now, we check the residuals of the model:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arima_simple_bulgaria_residuals %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arima_simple_bulgaria_residuals))
+```
+
+The residuals have checked the Ljung-Box text; however, they do not pass the normality test.
+
+We begin the forecast phase. The forecast is divided into two steps:
+1. The trend pronostic
+2. The residuals pronostic
+
+The final pronostic is given by the sum of the above ones.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+predicted_simple_bulgaria_trend <- predict(
+  lm_trend_simple_bulgaria,
+  newdata = data.frame(year = country_splits[["Bulgaria"]][["test"]]$year)
+)
+
+predicted_simple_bulgaria_residuals <- forecast(fit_arima_simple_bulgaria_residuals, h = get_length("Bulgaria", "test", "number_deaths"))
+
+forecast_simple_bulgaria_log <- predicted_simple_bulgaria_trend + predicted_simple_bulgaria_residuals$mean
+
+
+forecast_simple_bulgaria <- exp(forecast_simple_bulgaria_log)
+forecast_simple_bulgaria
+```
+
+Finally, we plot the forecasted time series versus the real values, on the original scale.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+plot_simple_bulgaria <- data.frame(
+  Year     = country_splits[["Bulgaria"]][["test"]]$year,
+  Actual   = country_splits[["Bulgaria"]][["test"]]$number_deaths,
+  Forecast = forecast_simple_bulgaria
+)
+
+ggplot(plot_simple_bulgaria, aes(x = Year)) +
+  geom_line(aes(y = Actual,   color = "Actual")) +
+  geom_line(aes(y = Forecast, color = "Forecast"), linetype = "dashed") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")
+  ) +
+  labs(
+    title    = "Actual vs. Predicted TB deaths",
+    subtitle = "Model: log(number_deaths) ~ year + ARMA(1,0) in residuals",
+    x        = "Year (Test Set: 2001–2010)",
+    y        = "Number of Deaths",
+    color    = "Serie"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title        = element_text(face = "bold", size = 16),
+    plot.subtitle     = element_text(size = 13),
+    axis.text         = element_text(size = 11),
+    axis.title        = element_text(size = 12),
+    legend.position   = "right"
+  )
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+actual_bulgaria <- country_splits[["Bulgaria"]][["test"]]$number_deaths
+
+
+error_summary_simple_bulgaria <- data.frame(
+  Model = "log(number_deaths) ~ year",
+  ME = mean(actual_bulgaria - forecast_simple_bulgaria),
+  RMSE = rmse(actual_bulgaria, forecast_simple_bulgaria),
+  MPE = mean((actual_bulgaria - forecast_simple_bulgaria) / actual_bulgaria) * 100,
+  MAE = mae(actual_bulgaria, forecast_simple_bulgaria),
+  MAPE = mape(actual_bulgaria, forecast_simple_bulgaria) * 100
+)
+
+
+error_summary_simple_bulgaria
+```
+The trend‐only regression (log deaths \~ year) achieves ME = –37.21, RMSE = 42.85, and MAPE ≈ 44.97%, slightly outperforming ARIMA(1,1,1) on RMSE (43.88 vs. 42.85) and MAPE (50.28% vs. 44.97%). Although both models overpredict modestly, the simple linear trend captures most of the series’ dynamics with comparable or better average error than the more complex ARIMA.
+
+
+#### Complete regression
+
+Now, as we have the population and gdp per capita regressors, we will define a regression model with those variables. Note that in this approach, the shorter dataset will be used, in order to asses the discrepancies on variables' lengths.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+bulgaria_short_train_df <- countries_short[["Bulgaria"]][["train"]]
+log_population_bulgaria <- log(bulgaria_short_train_df$population)
+log_gdp_capita_bulgaria <- log(bulgaria_short_train_df$gdp_capita)
+
+lm_trend_complete_bulgaria <- lm(train_bulgaria_short ~ year + log_population_bulgaria + log_gdp_capita_bulgaria, data = bulgaria_short_train_df)
+
+summary(lm_trend_complete_bulgaria)
+```
+The multiple regression of $\log(\text{deaths})$ on year, $\log(\text{population})$, and $\log(\text{GDP per capita})$ explains 64.03% of the variance ($R^2 = 0.6403$) with a very small residual error (0.1431). Holding population and GDP constant, the coefficient for year is $-0.04583$, indicating a significant annual decline in log‐deaths. 
+
+Now, we need to check the residuals of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+lm_trend_complete_bulgaria %>% forecast::checkresiduals()
+
+complete_bulgaria_residuals <- residuals(lm_trend_complete_bulgaria)
+
+```
+In contrast with the simple regression, the residuals of the regression do not capture all the temporal structure. We need to further study the residuals.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+acf(complete_bulgaria_residuals)
+pacf(complete_bulgaria_residuals)
+
+```
+The ACF plot shows a spike at lag 1 followed by a gradual decay over lags 2-5, where it begins to increase again and has significant spikes at lags 4-5. The PACF plot exhibits a single dominant spike at lag 1 with all higher-lag partial autocorrelations inside the confidence boundaries. This pattern may suggest a more complex model for the residuals. We will study the ARMA(1,1).
+
+We fit this model on the residuals.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arima_complete_bulgaria_residuals <- Arima(complete_bulgaria_residuals, order = c(1, 0, 4))
+summary(fit_arima_complete_bulgaria_residuals)
+
+```
+The low AIC value indicates a good fit. We check now the residuals:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arima_complete_bulgaria_residuals %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_arima_complete_bulgaria_residuals))
+```
+Now the residuals satisfy the necessary hypothesis. We begin the pronostics.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+predicted_complete_bulgaria_trend <- predict(
+  lm_trend_complete_bulgaria,
+  newdata = data.frame(
+    year = countries_short[["Bulgaria"]][["test"]][["year"]],
+    log_population_bulgaria = log(countries_short[["Bulgaria"]][["test"]][["population"]]),
+    log_gdp_capita_bulgaria = log(countries_short[["Bulgaria"]][["test"]][["gdp_capita"]])
+  )
+)
+
+predicted_complete_bulgaria_log_residuals <- forecast(fit_arima_complete_bulgaria_residuals, h = length(countries_short[["Bulgaria"]][["test"]][["year"]]))
+
+forecast_complete_bulgaria_log <- predicted_complete_bulgaria_trend + predicted_complete_bulgaria_log_residuals$mean
+
+
+forecast_complete_bulgaria <- exp(forecast_complete_bulgaria_log)
+forecast_complete_bulgaria
+```
+
+Finally, let's plot the new regression:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+plot_complete_bulgaria <- data.frame(
+  Year     = countries_short[["Bulgaria"]][["test"]][["year"]],
+  Actual   = countries_short[["Bulgaria"]][["test"]][["number_deaths"]],
+  Forecast = forecast_complete_bulgaria
+)
+
+plot_complete_bulgaria
+
+ggplot(plot_complete_bulgaria, aes(x = Year)) +
+  geom_line(aes(y = Actual,   color = "Actual")) +
+  geom_line(aes(y = Forecast, color = "Forecast"), linetype = "dashed") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4", "Forecast" = "#2ca02c")
+  ) +
+  labs(
+    title    = "Actual vs. Forecast TB Deaths (Trend + Pop + GDP)",
+    subtitle = "Model: log_deaths ~ year + log_population + log_gdp + ARMA(1,4)",
+    x        = "Year (Test Set)",
+    y        = "Number of Deaths",
+    color    = "Series"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title        = element_text(face = "bold", size = 16),
+    plot.subtitle     = element_text(size = 13),
+    axis.text         = element_text(size = 11),
+    axis.title        = element_text(size = 12),
+    legend.position   = "right"
+  )
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+actual_bulgaria <- countries_short[["Bulgaria"]][["test"]][["number_deaths"]]
+
+error_summary_complete_bulgaria <- data.frame(
+  Model = "log(number_deaths) ~ year + log(population) + log(gdp_capita)",
+  ME = mean(actual_bulgaria - forecast_complete_bulgaria),
+  RMSE = rmse(actual_bulgaria, forecast_complete_bulgaria),
+  MPE = mean((actual_bulgaria - forecast_complete_bulgaria) / actual_bulgaria) * 100,
+  MAE = mae(actual_bulgaria, forecast_complete_bulgaria),
+  MAPE = mape(actual_bulgaria, forecast_complete_bulgaria) * 100
+)
+
+error_summary_complete_bulgaria
+```
+
+### The Netherlands
+
+#### Simple regression
+
+In this first regression, we will use the complete data, not the shorter one. 
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+train_netherlands_df <- country_splits[["Netherlands"]][["train"]] 
+country_splits[["Netherlands"]][["train"]] 
+
+lm_trend_simple_netherlands <- lm(train_netherlands ~ year, data = train_netherlands_df)
+summary(lm_trend_simple_netherlands)
+
+```
+
+The linear regression of log(number_deaths) on year yields an intercept of 85.84 and a slope of –0.04 (both highly significant, $p<2\mathrm{e}{-16}$), indicating a strong, steady annual decline in log‐deaths. The model explains 79.92% of the variance ($R^2=0.7992$), with residuals showing a moderate standard error (0.3616).
+
+Now, we need to further study the residuals of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+lm_trend_simple_netherlands %>% forecast::checkresiduals()
+
+simple_netherlands_residuals <- ts(residuals(lm_trend_simple_netherlands), start = 1950, frequency = 1)
+
+```
+
+As we see in the plot, the model has not fully capture the structure of the series, meaning we will need to determine an ARIMA structure for the residuals. We begin by plotting the ACF and PACF.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+acf(simple_netherlands_residuals )
+pacf(simple_netherlands_residuals )
+
+```
+The ACF plot shows an exponential decaying trend, whereas the PACF shows a significant spike at lag 1. This pattern may suggest an AR($1$) component for the residuals.
+
+Let's fit an ARMA($1,0$).
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+fit_arima_simple_netherlands_residuals <- Arima(simple_netherlands_residuals, order = c(1,0,0))
+summary(fit_arima_simple_netherlands_residuals)
+```
+
+It seems a well-fitted model (AIC value of $-43.4$). Now, we check the residuals of the model:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arima_simple_netherlands_residuals %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arima_simple_netherlands_residuals))
+```
+
+The residuals have checked the Ljung-Box text; however, they do not pass the normality test.
+
+We begin the forecast phase. The forecast is divided into two steps:
+1. The trend pronostic
+2. The residuals pronostic
+
+The final pronostic is given by the sum of the above ones.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+predicted_simple_netherlands_trend <- predict(
+  lm_trend_simple_netherlands,
+  newdata = data.frame(year = country_splits[["Netherlands"]][["test"]]$year)
+)
+
+predicted_simple_netherlands_residuals <- forecast(fit_arima_simple_netherlands_residuals, h = get_length("Netherlands", "test", "number_deaths"))
+
+forecast_simple_netherlands_log <- predicted_simple_netherlands_trend + predicted_simple_netherlands_residuals$mean
+
+
+forecast_simple_netherlands <- exp(forecast_simple_netherlands_log)
+forecast_simple_netherlands
+```
+
+Finally, we plot the forecasted time series versus the real values, on the original scale.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+plot_simple_netherlands <- data.frame(
+  Year     = country_splits[["Netherlands"]][["test"]]$year,
+  Actual   = country_splits[["Netherlands"]][["test"]]$number_deaths,
+  Forecast = forecast_simple_netherlands
+
+)
+
+ggplot(plot_simple_netherlands, aes(x = Year)) +
+  geom_line(aes(y = Actual,   color = "Actual")) +
+  geom_line(aes(y = Forecast, color = "Forecast"), linetype = "dashed") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4", "Forecast" = "#ff7f0e")
+  ) +
+  labs(
+    title    = "Actual vs. Predicted TB deaths",
+    subtitle = "Model: log(number_deaths) ~ year + ARMA(1,0) in residuals",
+    x        = "Year (Test Set: 2001–2010)",
+    y        = "Number of Deaths",
+    color    = "Serie"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title        = element_text(face = "bold", size = 16),
+    plot.subtitle     = element_text(size = 13),
+    axis.text         = element_text(size = 11),
+    axis.title        = element_text(size = 12),
+    legend.position   = "right"
+  )
+
+```
+
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+actual_netherlands <- country_splits[["Netherlands"]][["test"]]$number_deaths
+
+
+error_summary_simple_netherlands <- data.frame(
+  Model = "log(number_deaths) ~ year",
+  ME = mean(actual_netherlands - forecast_simple_netherlands),
+  RMSE = rmse(actual_netherlands, forecast_simple_netherlands),
+  MPE = mean((actual_netherlands - forecast_simple_netherlands) / actual_netherlands) * 100,
+  MAE = mae(actual_netherlands, forecast_simple_netherlands),
+  MAPE = mape(actual_netherlands, forecast_simple_netherlands) * 100
+)
+
+
+error_summary_simple_netherlands
+```
+
+#### Complete regression
+
+Now, as we have the population and gdp per capita regressors, we will define a regression model with those variables. Note that in this approach, the shorter dataset will be used, in order to asses the discrepancies on variables' lengths.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+netherlands_short_train_df <- countries_short[["Netherlands"]][["train"]]
+
+log_population_netherlands <- log(netherlands_short_train_df$population)
+log_gdp_capita_netherlands <- log(netherlands_short_train_df$gdp_capita)
+
+lm_trend_complete_netherlands <- lm(train_netherlands_short ~ year + log_population_netherlands + log_gdp_capita_netherlands, data = netherlands_short_train_df)
+
+summary(lm_trend_complete_netherlands)
+```
+The multiple regression of $\log(\text{deaths})$ on year, $\log(\text{population})$, and $\log(\text{GDP per capita})$ explains 81.68% of the variance ($R^2 = 0.8168$) with a very small residual error (0.1941). Holding population and GDP constant, the coefficient for year is $-0.0369$, indicating a significant annual decline in log‐deaths. 
+
+Now, we need to check the residuals of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+lm_trend_complete_netherlands %>% forecast::checkresiduals()
+
+complete_netherlands_residuals <- residuals(lm_trend_complete_netherlands)
+
+```
+In contrast with the simple regression, the residuals of the regression do not capture all the temporal structure. We need to further study the residuals.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+acf(complete_netherlands_residuals)
+pacf(complete_netherlands_residuals)
+
+
+acf(complete_netherlands_residuals %>% diff())
+pacf(complete_netherlands_residuals %>% diff())
+```
+The ACF plot shows a spike at lag 1 followed by a gradual decay. The PACF plot exhibits a single dominant spike at lag 1 with all higher-lag partial autocorrelations inside the confidence boundaries. This pattern may suggest a more complex model for the residuals. We will study the ARMA(1,3).
+
+We fit this model on the residuals.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arima_complete_netherlands_residuals <- Arima(complete_netherlands_residuals, order = c(2, 1, 2))
+summary(fit_arima_complete_netherlands_residuals)
+
+```
+The low AIC value indicates a good fit. We check now the residuals:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arima_complete_netherlands_residuals %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_arima_complete_netherlands_residuals))
+```
+Now the residuals satisfy the necessary hypothesis. We begin the pronostics.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+predicted_complete_netherlands_trend <- predict(
+  lm_trend_complete_netherlands,
+  newdata = data.frame(
+    year = countries_short[["Netherlands"]][["test"]][["year"]],
+    log_population_netherlands = log(countries_short[["Netherlands"]][["test"]][["population"]]),
+    log_gdp_capita_netherlands = log(countries_short[["Netherlands"]][["test"]][["gdp_capita"]])
+  )
+)
+
+predicted_complete_netherlands_log_residuals <- forecast(fit_arima_complete_netherlands_residuals, h = length(countries_short[["Netherlands"]][["test"]][["year"]]))
+
+forecast_complete_netherlands_log <- predicted_complete_netherlands_trend + predicted_complete_netherlands_log_residuals$mean
+
+
+forecast_complete_netherlands <- exp(forecast_complete_netherlands_log)
+forecast_complete_netherlands
+```
+
+Finally, let's plot the new regression:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+plot_complete_netherlands <- data.frame(
+  Year     = countries_short[["Netherlands"]][["test"]][["year"]],
+  Actual   = countries_short[["Netherlands"]][["test"]][["number_deaths"]],
+  Forecast = forecast_complete_netherlands
+)
+
+ggplot(plot_complete_netherlands, aes(x = Year)) +
+  geom_line(aes(y = Actual,   color = "Actual")) +
+  geom_line(aes(y = Forecast, color = "Forecast"), linetype = "dashed") +
+  scale_color_manual(
+    values = c("Actual" = "#1f77b4", "Forecast" = "#2ca02c")
+  ) +
+  labs(
+    title    = "Actual vs. Forecast TB Deaths (Trend + Pop + GDP)",
+    subtitle = "Model: log_deaths ~ year + log_population + log_gdp + ARIMA(2,1,2)",
+    x        = "Year (Test Set)",
+    y        = "Number of Deaths",
+    color    = "Series"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title        = element_text(face = "bold", size = 16),
+    plot.subtitle     = element_text(size = 13),
+    axis.text         = element_text(size = 11),
+    axis.title        = element_text(size = 12),
+    legend.position   = "right"
+  )
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+actual_netherlands <- countries_short[["Netherlands"]][["test"]][["number_deaths"]]
+
+error_summary_complete_netherlands <- data.frame(
+  Model = "log(number_deaths) ~ year + log(population) + log(gdp_capita)",
+  ME = mean(actual_netherlands - forecast_complete_netherlands),
+  RMSE = rmse(actual_netherlands, forecast_complete_netherlands),
+  MPE = mean((actual_netherlands - forecast_complete_netherlands) / actual_netherlands) * 100,
+  MAE = mae(actual_netherlands, forecast_complete_netherlands),
+  MAPE = mape(actual_netherlands, forecast_complete_netherlands) * 100
+)
+
+error_summary_complete_netherlands
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+### Modeling regressors -- prediction
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+plot_ts(ts(log(train_spain_df$population), start = 1951, frequency = 1)) + theme_minimal()
+```
+We try to fix an ARIMA model using auto.arima()
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+fit_pop_spain <- auto.arima(ts(log(train_spain_df$population), start = 1951, frequency = 1))
+summary(fit_pop_spain)
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_pop_spain %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_pop_spain))
+
+```
+
+The residuals pass the Ljung-Box test, but not the normality test.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+forecasted_pop_spain <- forecast(fit_pop_spain, level = c(95), h = get_length("Spain", "test", "population"), bootstrap = TRUE)
+
+autoplot(forecasted_pop_spain)  + theme_minimal()
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_pop_spain <- ts(country_splits[["Spain"]][["test"]][["population"]], start =2011, frequency = 1)
+
+plot_pop_spain <- data.frame(
+  Year = seq_along(test_pop_spain),
+  Actual = test_pop_spain,
+  Predicted = exp(forecasted_pop_spain$mean)
+)
+
+
+ggplot(plot_pop_spain, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted population - ARIMA(4,1,0)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
 
 
 
 ```
+
+Now we do the same for gdp per capita.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+plot_ts(ts(log(spain_short_train_df$gdp_capita), start = 1960, frequency = 1)) + theme_minimal()
+```
+We try to fix an ARIMA model using auto.arima()
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+summary(lm(log(spain_short_train_df$gdp_capita) ~ spain_short_train_df$year))
+
+lm(log(spain_short_train_df$gdp_capita) ~ spain_short_train_df$year) %>% forecast::checkresiduals()
+auto.arima(residuals(lm(log(spain_short_train_df$gdp_capita) ~ spain_short_train_df$year)))
+
+fit_gdp_spain <- auto.arima(ts(log(spain_short_train_df$gdp_capita), start = 1960, frequency = 1))
+summary(fit_gdp_spain)
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_gdp_spain %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_gdp_spain))
+
+```
+
+The residuals pass the Ljung-Box test and the normality test.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+forecasted_gdp_spain <- forecast(fit_gdp_spain, level = c(95), h = 12)
+
+autoplot(forecasted_gdp_spain)  + theme_minimal()
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_gdp_spain <- ts(countries_short[["Spain"]][["test"]][["gdp_capita"]], start =2010, frequency = 1)
+
+plot_gdp_spain <- data.frame(
+  Year = seq_along(test_gdp_spain),
+  Actual = test_gdp_spain,
+  Predicted = exp(forecasted_gdp_spain$mean)
+)
+
+
+ggplot(plot_gdp_spain, aes(x = Year)) +
+  geom_line(aes(y = Actual, color = "Actual")) +
+  geom_line(aes(y = Predicted, color = "Predicted"), linetype = "dashed") +
+  scale_color_manual(values = c("Actual" = "#1f77b4", "Predicted" = "#ff7f0e")) +
+  labs(title = "Actual vs Predicted population - ARIMA(1,1,0)",
+       x = "Year (Test Set)",
+       y = "Number of Deaths",
+       color = "Legend") +
+  theme_minimal()
+
+
+
+```
+
+
+
+
+
+
 
 
 
