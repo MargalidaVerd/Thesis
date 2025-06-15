@@ -34,18 +34,45 @@ mean_df <- map2_dfr(dens_sources, t_vals, function(x, t) {
   )
 })
 
+max_y <- max(dens_df$y - 0.5)
+
+seg_df <- data.frame(
+  x    = t_vals,
+  xend = t_vals,
+  y    = -9,      
+  yend =  5
+)
+
 ggplot() +
   geom_polygon(data = dens_df, aes(x = t, y = y, group = grupo), 
-               fill = "darkblue", alpha = 0.9) +
-  geom_line(data = mean_df, aes(x = t, y = y), color = "black", linewidth = 0.6) +
-  geom_point(data = mean_df, aes(x = t, y = y), color = "black", size = 0.5) +
+               fill = "#1753b3", alpha = 0.9) +
+  geom_line(data = mean_df, aes(x = t, y = y), color = "black", linewidth = 0.4) +
+  geom_point(data = mean_df, aes(x = t, y = y), color = "black", size = 0.4) +
+  
+  geom_segment(data = seg_df,
+               aes(x = x,
+                   xend = xend,
+                   y  = y,
+                   yend = yend),
+               colour = "grey40",
+               linewidth = 0.2) +
+  geom_text(data = data.frame(t = t_vals, y = max_y + 0.1),
+            aes(x = t, y = y, label = paste0("Y_", t_vals)),
+            vjust = 0, hjust=0.3, size = 3) + 
   scale_x_continuous(
     breaks = t_vals,
-    labels = paste0("Y_", t_vals),
+    labels = paste0(t_vals),
     expand = expansion(mult = c(0.01, 0.01))
   ) +
   labs(x = "Time", y = "Y") +
   theme_minimal(base_size = 14) +
-  theme(axis.text.x = element_text(size = 12),
-        axis.title = element_text(size = 14))
+  theme(
+    panel.grid.major = element_blank(),   
+    panel.grid.minor = element_blank(),  
+    panel.background = element_rect(fill = "white", colour = NA),
+    plot.background = element_rect(fill = "white", colour = NA),
+    axis.text.x = element_text(size = 12),
+    axis.text.y = element_text(size = 0),
+    axis.title = element_text(size = 14)
+  )
 

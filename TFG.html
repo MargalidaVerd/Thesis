@@ -396,7 +396,10 @@ $ gdp_capita                        &lt;dbl&gt; 674.7934, 717.3800, 1009.9771, 5
 <span id="cb18-6"><a href="#cb18-6" aria-hidden="true" tabindex="-1"></a>  country_splits[[country]][[<span class="st">"test"</span>]] <span class="ot">=</span> country_dataset[(total_len <span class="sc">-</span> test_len <span class="sc">+</span> <span class="dv">1</span>)<span class="sc">:</span>total_len,]</span>
 <span id="cb18-7"><a href="#cb18-7" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
-<p>We now define two utility functions. The first is designed to automate the selection of ARIMA models by systematically evaluating various parameter combinations and reporting their corresponding Akaike Information Criterion (AIC) values. This approach allows for an informed and reproducible model selection process, particularly useful when the number of possible <span class="math inline">\((p,d,q)\)</span> combinations is large and exhaustive testing is impractical.</p>
+</section>
+<section id="arima-model-utilities" class="level2">
+<h2 class="anchored" data-anchor-id="arima-model-utilities">ARIMA model utilities</h2>
+<p>We now define two new functions. The first is designed to automate the selection of ARIMA models by systematically evaluating various parameter combinations and reporting their corresponding Akaike Information Criterion (AIC) values. This approach allows for an informed and reproducible model selection process, particularly useful when the number of possible <span class="math inline">\((p,d,q)\)</span> combinations is large and exhaustive testing is impractical.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb19"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb19-1"><a href="#cb19-1" aria-hidden="true" tabindex="-1"></a>try_all_arima <span class="ot">&lt;-</span> <span class="cf">function</span>(ar_coef, d_coef, ma_coef, time_series) {</span>
 <span id="cb19-2"><a href="#cb19-2" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (p <span class="cf">in</span> ar_coef) {</span>
@@ -412,23 +415,265 @@ $ gdp_capita                        &lt;dbl&gt; 674.7934, 717.3800, 1009.9771, 5
 <span id="cb19-12"><a href="#cb19-12" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>This function iterates over all specified combinations of autoregressive (AR), differencing (I), and moving average (MA) orders. For each configuration, it fits an ARIMA model and outputs the estimated parameters along with the AIC value, which serves as the model selection criterion.</p>
-<p>The second function is responsible for fitting an ARIMA model to the training series of a given country. It takes as input the ARIMA parameters <span class="math inline">\((p,d,q)\)</span> and a country name, and includes an optional boolean argument, <code>log_transform</code>. This parameter allows the user to specify whether the time series should be log-transformed prior to model fitting. This functionality ensures flexibility in handling different types of data distributions, particularly those exhibiting heteroscedasticity or exponential decay patterns. It uses the <code>Arima()</code> function of the <code>forecast</code> package.</p>
-<div class="cell">
-<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>fit_arima <span class="ot">&lt;-</span> <span class="cf">function</span>(p, d, q, country, <span class="at">log_transform =</span> <span class="cn">TRUE</span>) {</span>
-<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  series <span class="ot">&lt;-</span> country_splits[[country]]<span class="sc">$</span>train<span class="sc">$</span>number_deaths</span>
-<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (log_transform) {</span>
-<span id="cb20-4"><a href="#cb20-4" aria-hidden="true" tabindex="-1"></a>    series <span class="ot">&lt;-</span> <span class="fu">log</span>(series)</span>
-<span id="cb20-5"><a href="#cb20-5" aria-hidden="true" tabindex="-1"></a>  }</span>
-<span id="cb20-6"><a href="#cb20-6" aria-hidden="true" tabindex="-1"></a>  train_ts <span class="ot">&lt;-</span> <span class="fu">ts</span>(series)</span>
-<span id="cb20-7"><a href="#cb20-7" aria-hidden="true" tabindex="-1"></a>  arima_fit <span class="ot">&lt;-</span> <span class="fu">Arima</span>(train_ts, <span class="at">order =</span> <span class="fu">c</span>(p, d, q))</span>
-<span id="cb20-8"><a href="#cb20-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(arima_fit)</span>
-<span id="cb20-9"><a href="#cb20-9" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
-</div>
 <p>Finally, we define the get_length function to facilitate quick retrieval of the number of non-missing observations in a specified dataset. Accessing time series lengths manually for each country and subset (full, train, or test) can be cumbersome and error-prone. This utility function simplifies the process by requiring only the country name, the desired subset, and the target variable. It returns the number of valid (non-NA) entries.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>get_length <span class="ot">&lt;-</span> <span class="cf">function</span>(country, set, variable) {</span>
-<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(<span class="fu">length</span>(<span class="fu">na.omit</span>(country_splits[[country]][[set]][[variable]])))</span>
+<div class="sourceCode cell-code" id="cb20"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a>get_length <span class="ot">&lt;-</span> <span class="cf">function</span>(country, set, variable) {</span>
+<span id="cb20-2"><a href="#cb20-2" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(<span class="fu">length</span>(<span class="fu">na.omit</span>(country_splits[[country]][[set]][[variable]])))</span>
+<span id="cb20-3"><a href="#cb20-3" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>To extend the forecasting framework and provide a robust evaluation of model performance, we developed a set of utility functions that automate the rolling forecast process, visualize predictions at different horizons, and summarize forecast accuracy through key error metrics.</p>
+<p>We begin by defining a model constructor called <code>fit_manual_model()</code>, which takes ARIMA orders <span class="math inline">\((p,d,q)\)</span> as input and returns a function that fits a model with those parameters to any given time series. This functional approach allows for flexible reuse across different datasets and rolling windows without hardcoding model specifications.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb21"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb21-1"><a href="#cb21-1" aria-hidden="true" tabindex="-1"></a>fitting_function <span class="ot">&lt;-</span> <span class="cf">function</span>(p, d, q) {</span>
+<span id="cb21-2"><a href="#cb21-2" aria-hidden="true" tabindex="-1"></a>  <span class="cf">function</span>(y) <span class="fu">Arima</span>(y, <span class="at">order =</span> <span class="fu">c</span>(p, d, q))</span>
 <span id="cb21-3"><a href="#cb21-3" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>The core of the forecasting mechanism is implemented in the function <code>rolling_forecast()</code>.</p>
+<p>This function simulates a real-time prediction scenario by iteratively refitting the model to an expanding training set. At each iteration, it fits the model to the currently available data and generates forecasts up to a specified horizon (e.g., 1, 3, and 5 years ahead). These predictions are stored in a matrix with dimensions corresponding to the length of the test set and the number of horizons. Importantly, the function only retains the forecasted values that correspond to actual future observations in the test set, ensuring a fair comparison. The following table shows the main idea of the function:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code> Iteration Data_used_to_fit Forecast_block                     Data_stored
+         1        1951–2010      2011–2015 h1 → 2011, h3 → 2013, h5 → 2015
+         2        1951–2011      2012–2016 h1 → 2012, h3 → 2014, h5 → 2016
+         3        1951–2012      2013–2017 h1 → 2013, h3 → 2015, h5 → 2017</code></pre>
+</div>
+</div>
+<p>To visualize the model behavior at different forecast horizons, the function <code>make_horizon_plots()</code> creates a series of time series plots. It takes as input the training and testing series, along with two fitting functions (typically one for a manually specified model and another using <code>auto.arima()</code>), and returns separate plots for each forecast horizon (1, 3, and 5 years). In each plot, the actual data are shown in the original scale, alongside the predictions from both models.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb23"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a>make_horizon_plots <span class="ot">&lt;-</span> <span class="cf">function</span>(train_series, test_series, fit_fixed_fun, fit_auto_fun, <span class="at">horizons =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">3</span>,<span class="dv">5</span>)) {</span>
+<span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>  pred_fixed <span class="ot">&lt;-</span> <span class="fu">rolling_forecast</span>(train_series, test_series,</span>
+<span id="cb23-4"><a href="#cb23-4" aria-hidden="true" tabindex="-1"></a>                                 <span class="at">fitting_function =</span> fit_fixed_fun,</span>
+<span id="cb23-5"><a href="#cb23-5" aria-hidden="true" tabindex="-1"></a>                                 <span class="at">h_max =</span> <span class="fu">max</span>(horizons), <span class="at">horizons =</span> horizons)</span>
+<span id="cb23-6"><a href="#cb23-6" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb23-7"><a href="#cb23-7" aria-hidden="true" tabindex="-1"></a>  pred_auto  <span class="ot">&lt;-</span> <span class="fu">rolling_forecast</span>(train_series, test_series,</span>
+<span id="cb23-8"><a href="#cb23-8" aria-hidden="true" tabindex="-1"></a>                                 <span class="at">fitting_function =</span> fit_auto_fun,</span>
+<span id="cb23-9"><a href="#cb23-9" aria-hidden="true" tabindex="-1"></a>                                 <span class="at">h_max =</span> <span class="fu">max</span>(horizons), <span class="at">horizons =</span> horizons)</span>
+<span id="cb23-10"><a href="#cb23-10" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb23-11"><a href="#cb23-11" aria-hidden="true" tabindex="-1"></a>  df_fixed <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(pred_fixed) <span class="sc">%&gt;%</span> </span>
+<span id="cb23-12"><a href="#cb23-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">time</span>(test_series)) <span class="sc">%&gt;%</span></span>
+<span id="cb23-13"><a href="#cb23-13" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_longer</span>(<span class="sc">-</span>year, <span class="at">names_to =</span> <span class="st">"Horizon"</span>, <span class="at">values_to =</span> <span class="st">"Value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb23-14"><a href="#cb23-14" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">Value =</span> <span class="fu">exp</span>(<span class="fu">as.numeric</span>(Value)),</span>
+<span id="cb23-15"><a href="#cb23-15" aria-hidden="true" tabindex="-1"></a>           <span class="at">Model =</span> <span class="st">"Fixed"</span>)</span>
+<span id="cb23-16"><a href="#cb23-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb23-17"><a href="#cb23-17" aria-hidden="true" tabindex="-1"></a>  df_auto  <span class="ot">&lt;-</span> <span class="fu">as.data.frame</span>(pred_auto)  <span class="sc">%&gt;%</span></span>
+<span id="cb23-18"><a href="#cb23-18" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">year =</span> <span class="fu">time</span>(test_series)) <span class="sc">%&gt;%</span></span>
+<span id="cb23-19"><a href="#cb23-19" aria-hidden="true" tabindex="-1"></a>    <span class="fu">pivot_longer</span>(<span class="sc">-</span>year, <span class="at">names_to =</span> <span class="st">"Horizon"</span>, <span class="at">values_to =</span> <span class="st">"Value"</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb23-20"><a href="#cb23-20" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">Value =</span> <span class="fu">exp</span>(<span class="fu">as.numeric</span>(Value)),</span>
+<span id="cb23-21"><a href="#cb23-21" aria-hidden="true" tabindex="-1"></a>           <span class="at">Model =</span> <span class="st">"Auto"</span>)</span>
+<span id="cb23-22"><a href="#cb23-22" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb23-23"><a href="#cb23-23" aria-hidden="true" tabindex="-1"></a>  df_actual <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb23-24"><a href="#cb23-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">year    =</span> <span class="fu">time</span>(test_series),</span>
+<span id="cb23-25"><a href="#cb23-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">Horizon =</span> <span class="st">"Actual"</span>,</span>
+<span id="cb23-26"><a href="#cb23-26" aria-hidden="true" tabindex="-1"></a>    <span class="at">Model   =</span> <span class="st">"Actual"</span>,</span>
+<span id="cb23-27"><a href="#cb23-27" aria-hidden="true" tabindex="-1"></a>    <span class="at">Value   =</span> <span class="fu">exp</span>(<span class="fu">as.numeric</span>(test_series))</span>
+<span id="cb23-28"><a href="#cb23-28" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb23-29"><a href="#cb23-29" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb23-30"><a href="#cb23-30" aria-hidden="true" tabindex="-1"></a>  plot_df <span class="ot">&lt;-</span> <span class="fu">bind_rows</span>(df_actual, df_fixed, df_auto) <span class="sc">%&gt;%</span> </span>
+<span id="cb23-31"><a href="#cb23-31" aria-hidden="true" tabindex="-1"></a>    <span class="fu">mutate</span>(<span class="at">Horizon =</span> <span class="fu">factor</span>(Horizon, <span class="at">levels =</span> <span class="fu">c</span>(<span class="st">"h1"</span>,<span class="st">"h3"</span>,<span class="st">"h5"</span>,<span class="st">"Actual"</span>)))</span>
+<span id="cb23-32"><a href="#cb23-32" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb23-33"><a href="#cb23-33" aria-hidden="true" tabindex="-1"></a>  make_single_plot <span class="ot">&lt;-</span> <span class="cf">function</span>(h) {</span>
+<span id="cb23-34"><a href="#cb23-34" aria-hidden="true" tabindex="-1"></a>    <span class="fu">ggplot</span>(<span class="fu">filter</span>(plot_df, Horizon <span class="sc">==</span> h <span class="sc">|</span> Model <span class="sc">==</span> <span class="st">"Actual"</span>),</span>
+<span id="cb23-35"><a href="#cb23-35" aria-hidden="true" tabindex="-1"></a>           <span class="fu">aes</span>(<span class="at">x =</span> year, <span class="at">y =</span> Value, <span class="at">colour =</span> Model, <span class="at">linetype =</span> Model)) <span class="sc">+</span></span>
+<span id="cb23-36"><a href="#cb23-36" aria-hidden="true" tabindex="-1"></a>      <span class="fu">geom_line</span>(<span class="at">na.rm =</span> <span class="cn">TRUE</span>) <span class="sc">+</span></span>
+<span id="cb23-37"><a href="#cb23-37" aria-hidden="true" tabindex="-1"></a>      <span class="fu">scale_colour_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="at">Actual =</span> <span class="st">"#1f77b4"</span>,</span>
+<span id="cb23-38"><a href="#cb23-38" aria-hidden="true" tabindex="-1"></a>                                     <span class="at">Auto   =</span> <span class="st">"#4daf4a"</span>,</span>
+<span id="cb23-39"><a href="#cb23-39" aria-hidden="true" tabindex="-1"></a>                                     <span class="at">Fixed  =</span> <span class="st">"#ff7f0e"</span>)) <span class="sc">+</span></span>
+<span id="cb23-40"><a href="#cb23-40" aria-hidden="true" tabindex="-1"></a>      <span class="fu">scale_linetype_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="at">Actual =</span> <span class="st">"solid"</span>,</span>
+<span id="cb23-41"><a href="#cb23-41" aria-hidden="true" tabindex="-1"></a>                                       <span class="at">Auto   =</span> <span class="st">"dashed"</span>,</span>
+<span id="cb23-42"><a href="#cb23-42" aria-hidden="true" tabindex="-1"></a>                                       <span class="at">Fixed  =</span> <span class="st">"dashed"</span>)) <span class="sc">+</span></span>
+<span id="cb23-43"><a href="#cb23-43" aria-hidden="true" tabindex="-1"></a>      <span class="fu">labs</span>(<span class="at">title =</span> <span class="fu">paste</span>(<span class="st">"Horizon"</span>, <span class="fu">substring</span>(h, <span class="dv">2</span>), <span class="st">"years"</span>),</span>
+<span id="cb23-44"><a href="#cb23-44" aria-hidden="true" tabindex="-1"></a>           <span class="at">x =</span> <span class="st">"Year"</span>, <span class="at">y =</span> <span class="st">"Number of deaths"</span>,</span>
+<span id="cb23-45"><a href="#cb23-45" aria-hidden="true" tabindex="-1"></a>           <span class="at">colour =</span> <span class="st">"Model"</span>, <span class="at">linetype =</span> <span class="st">"Model"</span>) <span class="sc">+</span></span>
+<span id="cb23-46"><a href="#cb23-46" aria-hidden="true" tabindex="-1"></a>      <span class="fu">theme_minimal</span>(<span class="at">base_size =</span> <span class="dv">13</span>)</span>
+<span id="cb23-47"><a href="#cb23-47" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb23-48"><a href="#cb23-48" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb23-49"><a href="#cb23-49" aria-hidden="true" tabindex="-1"></a>  plots <span class="ot">&lt;-</span> <span class="fu">lapply</span>(<span class="fu">paste0</span>(<span class="st">"h"</span>, horizons), make_single_plot)</span>
+<span id="cb23-50"><a href="#cb23-50" aria-hidden="true" tabindex="-1"></a>  <span class="fu">names</span>(plots) <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"h"</span>, horizons)</span>
+<span id="cb23-51"><a href="#cb23-51" aria-hidden="true" tabindex="-1"></a>  plots</span>
+<span id="cb23-52"><a href="#cb23-52" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>To simplify the generation of plots across countries, we define <code>make_country_plots()</code>. This function handles the preprocessing steps, including log-transforming the input series and converting them into time series objects with appropriate start years. It then invokes the plotting function described above and returns a list of plots, one for each horizon.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb24"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a>make_country_plots <span class="ot">&lt;-</span> <span class="cf">function</span>(country, p, d, q, start_year, <span class="at">horizons =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">3</span>,<span class="dv">5</span>)) {</span>
+<span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb24-3"><a href="#cb24-3" aria-hidden="true" tabindex="-1"></a>  train_raw <span class="ot">&lt;-</span> country_splits[[country]]<span class="sc">$</span>train<span class="sc">$</span>number_deaths</span>
+<span id="cb24-4"><a href="#cb24-4" aria-hidden="true" tabindex="-1"></a>  test_raw  <span class="ot">&lt;-</span> country_splits[[country]]<span class="sc">$</span>test<span class="sc">$</span>number_deaths</span>
+<span id="cb24-5"><a href="#cb24-5" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb24-6"><a href="#cb24-6" aria-hidden="true" tabindex="-1"></a>  train_ts <span class="ot">&lt;-</span> <span class="fu">ts</span>(<span class="fu">log</span>(train_raw), <span class="at">start=</span> start_year, <span class="at">frequency =</span> <span class="dv">1</span>)</span>
+<span id="cb24-7"><a href="#cb24-7" aria-hidden="true" tabindex="-1"></a>  test_ts  <span class="ot">&lt;-</span> <span class="fu">ts</span>(<span class="fu">log</span>(test_raw),  <span class="at">start =</span> <span class="fu">end</span>(train_ts)[<span class="dv">1</span>] <span class="sc">+</span> <span class="dv">1</span>, <span class="at">frequency =</span> <span class="dv">1</span>)</span>
+<span id="cb24-8"><a href="#cb24-8" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb24-9"><a href="#cb24-9" aria-hidden="true" tabindex="-1"></a>  fit_fixed_fun <span class="ot">&lt;-</span> <span class="fu">fitting_function</span>(p,d,q)</span>
+<span id="cb24-10"><a href="#cb24-10" aria-hidden="true" tabindex="-1"></a>  fit_auto_fun  <span class="ot">&lt;-</span> <span class="cf">function</span>(y) <span class="fu">auto.arima</span>(y, <span class="at">stepwise =</span> <span class="cn">FALSE</span>, <span class="at">approximation =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb24-11"><a href="#cb24-11" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb24-12"><a href="#cb24-12" aria-hidden="true" tabindex="-1"></a>  <span class="fu">make_horizon_plots</span>(train_ts, test_ts, fit_fixed_fun, fit_auto_fun, <span class="at">horizons =</span> horizons)</span>
+<span id="cb24-13"><a href="#cb24-13" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>In addition to visual inspection, we provide quantitative tools to assess forecast accuracy. The function <code>print_error_summary_model()</code> computes key performance metrics such as Mean Error (ME), Root Mean Squared Error (RMSE), Mean Absolute Error (MAE), Mean Percentage Error (MPE) and Mean Absolute Percentage Error (MAPE).</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb25"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb25-1"><a href="#cb25-1" aria-hidden="true" tabindex="-1"></a>print_error_summary_model <span class="ot">&lt;-</span> <span class="cf">function</span>(p,d,q,test_series, predicted_series) {</span>
+<span id="cb25-2"><a href="#cb25-2" aria-hidden="true" tabindex="-1"></a>  residuals <span class="ot">&lt;-</span> <span class="fu">exp</span>(test_series <span class="sc">-</span> predicted_series<span class="sc">$</span>mean)</span>
+<span id="cb25-3"><a href="#cb25-3" aria-hidden="true" tabindex="-1"></a>  test_exp <span class="ot">&lt;-</span> <span class="fu">exp</span>(test_series)</span>
+<span id="cb25-4"><a href="#cb25-4" aria-hidden="true" tabindex="-1"></a>  pred_exp <span class="ot">&lt;-</span> <span class="fu">exp</span>(predicted_series<span class="sc">$</span>mean)</span>
+<span id="cb25-5"><a href="#cb25-5" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb25-6"><a href="#cb25-6" aria-hidden="true" tabindex="-1"></a>  error_summary <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb25-7"><a href="#cb25-7" aria-hidden="true" tabindex="-1"></a>    <span class="at">Model =</span> <span class="fu">sprintf</span>(<span class="st">"ARIMA(%d,%d,%d)"</span>, p, d, q),</span>
+<span id="cb25-8"><a href="#cb25-8" aria-hidden="true" tabindex="-1"></a>    <span class="at">ME =</span> <span class="fu">mean</span>(test_exp<span class="sc">-</span> pred_exp),</span>
+<span id="cb25-9"><a href="#cb25-9" aria-hidden="true" tabindex="-1"></a>    <span class="at">RMSE =</span> <span class="fu">rmse</span>(test_exp, pred_exp),</span>
+<span id="cb25-10"><a href="#cb25-10" aria-hidden="true" tabindex="-1"></a>    <span class="at">MPE =</span> <span class="fu">mean</span>((test_exp<span class="sc">-</span>pred_exp) <span class="sc">/</span> test_exp) <span class="sc">*</span> <span class="dv">100</span>,</span>
+<span id="cb25-11"><a href="#cb25-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">MAE =</span> <span class="fu">mae</span>(test_exp, pred_exp),</span>
+<span id="cb25-12"><a href="#cb25-12" aria-hidden="true" tabindex="-1"></a>    <span class="at">MAPE =</span> <span class="fu">mape</span>(test_exp, pred_exp) <span class="sc">*</span> <span class="dv">100</span></span>
+<span id="cb25-13"><a href="#cb25-13" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb25-14"><a href="#cb25-14" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(error_summary)</span>
+<span id="cb25-15"><a href="#cb25-15" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>To compare two competing models directly, we define <code>print_error_summary_comparison()</code>, which returns a side-by-side summary of the same error metrics for both models. This facilitates objective model selection based on statistical accuracy rather than visual inspection alone.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb26"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb26-1"><a href="#cb26-1" aria-hidden="true" tabindex="-1"></a>print_error_summary_comparison <span class="ot">&lt;-</span> <span class="cf">function</span>(coef_1, coef_2, test_series, predicted_series_one, predicted_series_two) {</span>
+<span id="cb26-2"><a href="#cb26-2" aria-hidden="true" tabindex="-1"></a>  model_name_one <span class="ot">&lt;-</span> <span class="fu">sprintf</span>(<span class="st">"ARIMA(%d,%d,%d)"</span>, coef_1[[<span class="dv">1</span>]], coef_1[[<span class="dv">2</span>]], coef_1[[<span class="dv">3</span>]])</span>
+<span id="cb26-3"><a href="#cb26-3" aria-hidden="true" tabindex="-1"></a>  model_name_two <span class="ot">&lt;-</span> <span class="fu">sprintf</span>(<span class="st">"ARIMA(%d,%d,%d)"</span>, coef_2[[<span class="dv">1</span>]], coef_2[[<span class="dv">2</span>]], coef_2[[<span class="dv">3</span>]])</span>
+<span id="cb26-4"><a href="#cb26-4" aria-hidden="true" tabindex="-1"></a>  test_exp <span class="ot">&lt;-</span> <span class="fu">exp</span>(test_series)</span>
+<span id="cb26-5"><a href="#cb26-5" aria-hidden="true" tabindex="-1"></a>  pred_one_exp <span class="ot">&lt;-</span> <span class="fu">exp</span>(predicted_series_one<span class="sc">$</span>mean)</span>
+<span id="cb26-6"><a href="#cb26-6" aria-hidden="true" tabindex="-1"></a>  pred_two_exp <span class="ot">&lt;-</span> <span class="fu">exp</span>(predicted_series_two<span class="sc">$</span>mean)</span>
+<span id="cb26-7"><a href="#cb26-7" aria-hidden="true" tabindex="-1"></a>  residuals_one <span class="ot">&lt;-</span> test_exp <span class="sc">-</span> pred_one_exp</span>
+<span id="cb26-8"><a href="#cb26-8" aria-hidden="true" tabindex="-1"></a>  residuals_two <span class="ot">&lt;-</span> test_exp <span class="sc">-</span> pred_two_exp</span>
+<span id="cb26-9"><a href="#cb26-9" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb26-10"><a href="#cb26-10" aria-hidden="true" tabindex="-1"></a>  error_summary <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb26-11"><a href="#cb26-11" aria-hidden="true" tabindex="-1"></a>    <span class="at">Model =</span> <span class="fu">c</span>(model_name_one, model_name_two),</span>
+<span id="cb26-12"><a href="#cb26-12" aria-hidden="true" tabindex="-1"></a>    </span>
+<span id="cb26-13"><a href="#cb26-13" aria-hidden="true" tabindex="-1"></a>    <span class="at">ME =</span> <span class="fu">c</span>(<span class="fu">mean</span>(test_exp <span class="sc">-</span> pred_one_exp),</span>
+<span id="cb26-14"><a href="#cb26-14" aria-hidden="true" tabindex="-1"></a>         <span class="fu">mean</span>(test_exp <span class="sc">-</span> pred_two_exp)),</span>
+<span id="cb26-15"><a href="#cb26-15" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb26-16"><a href="#cb26-16" aria-hidden="true" tabindex="-1"></a>    <span class="at">RMSE =</span> <span class="fu">c</span>(<span class="fu">rmse</span>(test_exp, pred_one_exp),</span>
+<span id="cb26-17"><a href="#cb26-17" aria-hidden="true" tabindex="-1"></a>           <span class="fu">rmse</span>(test_exp, pred_two_exp)),</span>
+<span id="cb26-18"><a href="#cb26-18" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb26-19"><a href="#cb26-19" aria-hidden="true" tabindex="-1"></a>    <span class="at">MPE =</span> <span class="fu">c</span>(<span class="fu">mean</span>((test_exp <span class="sc">-</span> pred_one_exp) <span class="sc">/</span> test_exp) <span class="sc">*</span> <span class="dv">100</span>,</span>
+<span id="cb26-20"><a href="#cb26-20" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mean</span>((test_exp <span class="sc">-</span> pred_two_exp) <span class="sc">/</span> test_exp) <span class="sc">*</span> <span class="dv">100</span>),</span>
+<span id="cb26-21"><a href="#cb26-21" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb26-22"><a href="#cb26-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">MAE =</span> <span class="fu">c</span>(<span class="fu">mae</span>(test_exp, pred_one_exp),</span>
+<span id="cb26-23"><a href="#cb26-23" aria-hidden="true" tabindex="-1"></a>          <span class="fu">mae</span>(test_exp, pred_two_exp)),</span>
+<span id="cb26-24"><a href="#cb26-24" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb26-25"><a href="#cb26-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">MAPE =</span> <span class="fu">c</span>(<span class="fu">mape</span>(test_exp, pred_one_exp) <span class="sc">*</span> <span class="dv">100</span>,</span>
+<span id="cb26-26"><a href="#cb26-26" aria-hidden="true" tabindex="-1"></a>           <span class="fu">mape</span>(test_exp, pred_two_exp) <span class="sc">*</span> <span class="dv">100</span>))</span>
+<span id="cb26-27"><a href="#cb26-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb26-28"><a href="#cb26-28" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(error_summary)</span>
+<span id="cb26-29"><a href="#cb26-29" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<p>Finally, for quick exploratory analysis, we include two plotting functions: <code>print_predicted_vs_actual_plot()</code> and <code>print_comparison_models_plot()</code>. These allow for a direct comparison between actual and predicted values on the original scale, either for a single model or for two models simultaneously. The plots highlight where and when the models diverge from the observed data, complementing the numerical summaries.</p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb27"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb27-1"><a href="#cb27-1" aria-hidden="true" tabindex="-1"></a>print_predicted_vs_actual_plot <span class="ot">&lt;-</span> <span class="cf">function</span>(test_series, predicted_series) {</span>
+<span id="cb27-2"><a href="#cb27-2" aria-hidden="true" tabindex="-1"></a>  plot_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb27-3"><a href="#cb27-3" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> <span class="fu">seq_along</span>(test_series),</span>
+<span id="cb27-4"><a href="#cb27-4" aria-hidden="true" tabindex="-1"></a>    <span class="at">actual =</span> <span class="fu">exp</span>(<span class="fu">as.numeric</span>(test_series)),</span>
+<span id="cb27-5"><a href="#cb27-5" aria-hidden="true" tabindex="-1"></a>    <span class="at">predicted =</span> <span class="fu">exp</span>(<span class="fu">as.numeric</span>(predicted_series<span class="sc">$</span>mean))</span>
+<span id="cb27-6"><a href="#cb27-6" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb27-7"><a href="#cb27-7" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-8"><a href="#cb27-8" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(plot_df, <span class="fu">aes</span>(<span class="at">x =</span> year)) <span class="sc">+</span></span>
+<span id="cb27-9"><a href="#cb27-9" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y =</span> actual, <span class="at">color =</span> <span class="st">"Actual"</span>)) <span class="sc">+</span></span>
+<span id="cb27-10"><a href="#cb27-10" aria-hidden="true" tabindex="-1"></a>    <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y =</span> predicted, <span class="at">color =</span> <span class="st">"Predicted"</span>), <span class="at">linetype =</span> <span class="st">"dashed"</span>) <span class="sc">+</span></span>
+<span id="cb27-11"><a href="#cb27-11" aria-hidden="true" tabindex="-1"></a>    <span class="fu">scale_color_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"Actual"</span> <span class="ot">=</span> <span class="st">"#1f77b4"</span>, <span class="st">"Predicted"</span> <span class="ot">=</span> <span class="st">"#ff7f0e"</span>)) <span class="sc">+</span></span>
+<span id="cb27-12"><a href="#cb27-12" aria-hidden="true" tabindex="-1"></a>    <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Actual vs predicted TB deaths (original scale)"</span>,</span>
+<span id="cb27-13"><a href="#cb27-13" aria-hidden="true" tabindex="-1"></a>         <span class="at">x =</span> <span class="st">"Year"</span>,</span>
+<span id="cb27-14"><a href="#cb27-14" aria-hidden="true" tabindex="-1"></a>         <span class="at">y =</span> <span class="st">"Number of Deaths"</span>,</span>
+<span id="cb27-15"><a href="#cb27-15" aria-hidden="true" tabindex="-1"></a>         <span class="at">color =</span> <span class="st">"Legend"</span>) <span class="sc">+</span></span>
+<span id="cb27-16"><a href="#cb27-16" aria-hidden="true" tabindex="-1"></a>    <span class="fu">theme_minimal</span>()</span>
+<span id="cb27-17"><a href="#cb27-17" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-18"><a href="#cb27-18" aria-hidden="true" tabindex="-1"></a>  p</span>
+<span id="cb27-19"><a href="#cb27-19" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb27-20"><a href="#cb27-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb27-21"><a href="#cb27-21" aria-hidden="true" tabindex="-1"></a>print_comparison_models_plot <span class="ot">&lt;-</span> <span class="cf">function</span>(test_series, predicted_series_one, predicted_series_two) {</span>
+<span id="cb27-22"><a href="#cb27-22" aria-hidden="true" tabindex="-1"></a>  plot_df <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb27-23"><a href="#cb27-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">year =</span> <span class="fu">seq_along</span>(test_series),</span>
+<span id="cb27-24"><a href="#cb27-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">actual =</span> <span class="fu">exp</span>(<span class="fu">as.numeric</span>(test_series)),</span>
+<span id="cb27-25"><a href="#cb27-25" aria-hidden="true" tabindex="-1"></a>    auto_predicted_model <span class="ot">&lt;-</span> <span class="fu">exp</span>(<span class="fu">as.numeric</span>(predicted_series_one<span class="sc">$</span>mean)),</span>
+<span id="cb27-26"><a href="#cb27-26" aria-hidden="true" tabindex="-1"></a>    manual_adjusted_model <span class="ot">&lt;-</span> <span class="fu">exp</span>(<span class="fu">as.numeric</span>(predicted_series_two<span class="sc">$</span>mean))</span>
+<span id="cb27-27"><a href="#cb27-27" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb27-28"><a href="#cb27-28" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb27-29"><a href="#cb27-29" aria-hidden="true" tabindex="-1"></a>  p <span class="ot">&lt;-</span> <span class="fu">ggplot</span>(plot_df, <span class="fu">aes</span>(<span class="at">x =</span> year)) <span class="sc">+</span></span>
+<span id="cb27-30"><a href="#cb27-30" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y =</span> actual, <span class="at">color =</span> <span class="st">"Actual"</span>)) <span class="sc">+</span></span>
+<span id="cb27-31"><a href="#cb27-31" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y =</span> auto_predicted_model, <span class="at">color =</span> <span class="st">"auto_predicted_model"</span>), <span class="at">linetype =</span> <span class="st">"dashed"</span>) <span class="sc">+</span></span>
+<span id="cb27-32"><a href="#cb27-32" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y =</span> manual_adjusted_model, <span class="at">color =</span> <span class="st">"manual_adjusted_model"</span>), <span class="at">linetype =</span> <span class="st">"dashed"</span>) <span class="sc">+</span></span>
+<span id="cb27-33"><a href="#cb27-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"Actual"</span> <span class="ot">=</span> <span class="st">"#1f77b4"</span>, <span class="st">"auto_predicted_model"</span> <span class="ot">=</span> <span class="st">"#ff7f0e"</span>, <span class="st">"manual_adjusted_model"</span> <span class="ot">=</span> <span class="st">"#6ba292"</span>)) <span class="sc">+</span></span>
+<span id="cb27-34"><a href="#cb27-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Actual vs Predicted TB Deaths"</span>,</span>
+<span id="cb27-35"><a href="#cb27-35" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">"Year "</span>,</span>
+<span id="cb27-36"><a href="#cb27-36" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Number of Deaths"</span>,</span>
+<span id="cb27-37"><a href="#cb27-37" aria-hidden="true" tabindex="-1"></a>       <span class="at">color =</span> <span class="st">"Legend"</span>) <span class="sc">+</span></span>
+<span id="cb27-38"><a href="#cb27-38" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span>
+<span id="cb27-39"><a href="#cb27-39" aria-hidden="true" tabindex="-1"></a>  p</span>
+<span id="cb27-40"><a href="#cb27-40" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb28"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb28-1"><a href="#cb28-1" aria-hidden="true" tabindex="-1"></a>print_error_summary_rolling <span class="ot">&lt;-</span> <span class="cf">function</span>(actual,         </span>
+<span id="cb28-2"><a href="#cb28-2" aria-hidden="true" tabindex="-1"></a>                                        preds_list,     </span>
+<span id="cb28-3"><a href="#cb28-3" aria-hidden="true" tabindex="-1"></a>                                        <span class="at">horizons =</span> <span class="fu">c</span>(<span class="st">"h1"</span>, <span class="st">"h3"</span>, <span class="st">"h5"</span>))</span>
+<span id="cb28-4"><a href="#cb28-4" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb28-5"><a href="#cb28-5" aria-hidden="true" tabindex="-1"></a>  y_orig <span class="ot">&lt;-</span> actual                </span>
+<span id="cb28-6"><a href="#cb28-6" aria-hidden="true" tabindex="-1"></a>  rows   <span class="ot">&lt;-</span> <span class="fu">list</span>()</span>
+<span id="cb28-7"><a href="#cb28-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-8"><a href="#cb28-8" aria-hidden="true" tabindex="-1"></a>  <span class="cf">for</span> (model_name <span class="cf">in</span> <span class="fu">names</span>(preds_list)) {</span>
+<span id="cb28-9"><a href="#cb28-9" aria-hidden="true" tabindex="-1"></a>    pred_mat <span class="ot">&lt;-</span> preds_list[[model_name]]</span>
+<span id="cb28-10"><a href="#cb28-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-11"><a href="#cb28-11" aria-hidden="true" tabindex="-1"></a>    <span class="cf">for</span> (h <span class="cf">in</span> horizons) {</span>
+<span id="cb28-12"><a href="#cb28-12" aria-hidden="true" tabindex="-1"></a>      yhat <span class="ot">&lt;-</span> pred_mat[, h]            </span>
+<span id="cb28-13"><a href="#cb28-13" aria-hidden="true" tabindex="-1"></a>      keep <span class="ot">&lt;-</span> <span class="sc">!</span><span class="fu">is.na</span>(yhat)</span>
+<span id="cb28-14"><a href="#cb28-14" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-15"><a href="#cb28-15" aria-hidden="true" tabindex="-1"></a>      rows[[<span class="fu">paste</span>(model_name, h, <span class="at">sep =</span> <span class="st">"_"</span>)]] <span class="ot">&lt;-</span></span>
+<span id="cb28-16"><a href="#cb28-16" aria-hidden="true" tabindex="-1"></a>        <span class="fu">data.frame</span>(</span>
+<span id="cb28-17"><a href="#cb28-17" aria-hidden="true" tabindex="-1"></a>          <span class="at">Model =</span> <span class="fu">paste0</span>(model_name, <span class="st">"-"</span>, h),</span>
+<span id="cb28-18"><a href="#cb28-18" aria-hidden="true" tabindex="-1"></a>          <span class="at">ME    =</span> <span class="fu">mean</span>(y_orig[keep] <span class="sc">-</span> yhat[keep]),</span>
+<span id="cb28-19"><a href="#cb28-19" aria-hidden="true" tabindex="-1"></a>          <span class="at">RMSE  =</span> <span class="fu">rmse</span>(y_orig[keep], yhat[keep]),</span>
+<span id="cb28-20"><a href="#cb28-20" aria-hidden="true" tabindex="-1"></a>          <span class="at">MAE   =</span> <span class="fu">mae</span> (y_orig[keep], yhat[keep]),</span>
+<span id="cb28-21"><a href="#cb28-21" aria-hidden="true" tabindex="-1"></a>          <span class="at">MAPE  =</span> <span class="fu">mape</span>(y_orig[keep], yhat[keep]) <span class="sc">*</span> <span class="dv">100</span>,</span>
+<span id="cb28-22"><a href="#cb28-22" aria-hidden="true" tabindex="-1"></a>          <span class="at">row.names =</span> <span class="cn">NULL</span></span>
+<span id="cb28-23"><a href="#cb28-23" aria-hidden="true" tabindex="-1"></a>        )</span>
+<span id="cb28-24"><a href="#cb28-24" aria-hidden="true" tabindex="-1"></a>    }</span>
+<span id="cb28-25"><a href="#cb28-25" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb28-26"><a href="#cb28-26" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">bind_rows</span>(rows)</span>
+<span id="cb28-27"><a href="#cb28-27" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb28-28"><a href="#cb28-28" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-29"><a href="#cb28-29" aria-hidden="true" tabindex="-1"></a>get_error_metrics <span class="ot">&lt;-</span> <span class="cf">function</span>(country, p, d, q,</span>
+<span id="cb28-30"><a href="#cb28-30" aria-hidden="true" tabindex="-1"></a>                              start_year,</span>
+<span id="cb28-31"><a href="#cb28-31" aria-hidden="true" tabindex="-1"></a>                              <span class="at">horizons =</span> <span class="fu">c</span>(<span class="dv">1</span>, <span class="dv">3</span>, <span class="dv">5</span>))</span>
+<span id="cb28-32"><a href="#cb28-32" aria-hidden="true" tabindex="-1"></a>{</span>
+<span id="cb28-33"><a href="#cb28-33" aria-hidden="true" tabindex="-1"></a>  train_raw <span class="ot">&lt;-</span> country_splits[[country]]<span class="sc">$</span>train<span class="sc">$</span>number_deaths</span>
+<span id="cb28-34"><a href="#cb28-34" aria-hidden="true" tabindex="-1"></a>  test_raw  <span class="ot">&lt;-</span> country_splits[[country]]<span class="sc">$</span>test<span class="sc">$</span>number_deaths</span>
+<span id="cb28-35"><a href="#cb28-35" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-36"><a href="#cb28-36" aria-hidden="true" tabindex="-1"></a>  train_log <span class="ot">&lt;-</span> <span class="fu">ts</span>(<span class="fu">log</span>(train_raw), <span class="at">start =</span> start_year,       <span class="at">frequency =</span> <span class="dv">1</span>)</span>
+<span id="cb28-37"><a href="#cb28-37" aria-hidden="true" tabindex="-1"></a>  test_log  <span class="ot">&lt;-</span> <span class="fu">ts</span>(<span class="fu">log</span>(test_raw),  <span class="at">start =</span> <span class="fu">end</span>(train_log)[<span class="dv">1</span>] <span class="sc">+</span> <span class="dv">1</span>, <span class="at">frequency =</span> <span class="dv">1</span>)</span>
+<span id="cb28-38"><a href="#cb28-38" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-39"><a href="#cb28-39" aria-hidden="true" tabindex="-1"></a>  fit_fixed <span class="ot">&lt;-</span> <span class="cf">function</span>(y) <span class="fu">Arima</span>(y, <span class="at">order =</span> <span class="fu">c</span>(p, d, q))</span>
+<span id="cb28-40"><a href="#cb28-40" aria-hidden="true" tabindex="-1"></a>  fit_auto  <span class="ot">&lt;-</span> <span class="cf">function</span>(y) <span class="fu">auto.arima</span>(y, <span class="at">stepwise =</span> <span class="cn">FALSE</span>, <span class="at">approximation =</span> <span class="cn">FALSE</span>)</span>
+<span id="cb28-41"><a href="#cb28-41" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-42"><a href="#cb28-42" aria-hidden="true" tabindex="-1"></a>  h_max <span class="ot">&lt;-</span> <span class="fu">max</span>(horizons)</span>
+<span id="cb28-43"><a href="#cb28-43" aria-hidden="true" tabindex="-1"></a>  horizons_char <span class="ot">&lt;-</span> <span class="fu">paste0</span>(<span class="st">"h"</span>, horizons)</span>
+<span id="cb28-44"><a href="#cb28-44" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-45"><a href="#cb28-45" aria-hidden="true" tabindex="-1"></a>  pred_fixed_log <span class="ot">&lt;-</span> <span class="fu">rolling_forecast</span>(train_log, test_log, fit_fixed,</span>
+<span id="cb28-46"><a href="#cb28-46" aria-hidden="true" tabindex="-1"></a>                                     <span class="at">h_max =</span> h_max, <span class="at">horizons =</span> horizons)</span>
+<span id="cb28-47"><a href="#cb28-47" aria-hidden="true" tabindex="-1"></a>  pred_auto_log  <span class="ot">&lt;-</span> <span class="fu">rolling_forecast</span>(train_log, test_log, fit_auto,</span>
+<span id="cb28-48"><a href="#cb28-48" aria-hidden="true" tabindex="-1"></a>                                     <span class="at">h_max =</span> h_max, <span class="at">horizons =</span> horizons)</span>
+<span id="cb28-49"><a href="#cb28-49" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-50"><a href="#cb28-50" aria-hidden="true" tabindex="-1"></a>  err_tbl <span class="ot">&lt;-</span> <span class="fu">print_error_summary_rolling</span>(</span>
+<span id="cb28-51"><a href="#cb28-51" aria-hidden="true" tabindex="-1"></a>    <span class="at">actual     =</span> test_raw,                     </span>
+<span id="cb28-52"><a href="#cb28-52" aria-hidden="true" tabindex="-1"></a>    <span class="at">preds_list =</span> <span class="fu">list</span>(</span>
+<span id="cb28-53"><a href="#cb28-53" aria-hidden="true" tabindex="-1"></a>      <span class="at">Manual =</span> <span class="fu">exp</span>(pred_fixed_log),           </span>
+<span id="cb28-54"><a href="#cb28-54" aria-hidden="true" tabindex="-1"></a>      <span class="at">Auto   =</span> <span class="fu">exp</span>(pred_auto_log)</span>
+<span id="cb28-55"><a href="#cb28-55" aria-hidden="true" tabindex="-1"></a>    ),</span>
+<span id="cb28-56"><a href="#cb28-56" aria-hidden="true" tabindex="-1"></a>    <span class="at">horizons  =</span> horizons_char</span>
+<span id="cb28-57"><a href="#cb28-57" aria-hidden="true" tabindex="-1"></a>  )</span>
+<span id="cb28-58"><a href="#cb28-58" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb28-59"><a href="#cb28-59" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(err_tbl)</span>
+<span id="cb28-60"><a href="#cb28-60" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+</div>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb29"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb29-1"><a href="#cb29-1" aria-hidden="true" tabindex="-1"></a>fit_arima <span class="ot">&lt;-</span> <span class="cf">function</span>(p, d, q, country, <span class="at">log_transform =</span> <span class="cn">TRUE</span>) {</span>
+<span id="cb29-2"><a href="#cb29-2" aria-hidden="true" tabindex="-1"></a>  series <span class="ot">&lt;-</span> country_splits[[country]]<span class="sc">$</span>train<span class="sc">$</span>number_deaths</span>
+<span id="cb29-3"><a href="#cb29-3" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (log_transform) {</span>
+<span id="cb29-4"><a href="#cb29-4" aria-hidden="true" tabindex="-1"></a>    series <span class="ot">&lt;-</span> <span class="fu">log</span>(series)</span>
+<span id="cb29-5"><a href="#cb29-5" aria-hidden="true" tabindex="-1"></a>  }</span>
+<span id="cb29-6"><a href="#cb29-6" aria-hidden="true" tabindex="-1"></a>  train_ts <span class="ot">&lt;-</span> <span class="fu">ts</span>(series)</span>
+<span id="cb29-7"><a href="#cb29-7" aria-hidden="true" tabindex="-1"></a>  arima_fit <span class="ot">&lt;-</span> <span class="fu">Arima</span>(train_ts, <span class="at">order =</span> <span class="fu">c</span>(p, d, q))</span>
+<span id="cb29-8"><a href="#cb29-8" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(arima_fit)</span>
+<span id="cb29-9"><a href="#cb29-9" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="arima-models" class="level2">
@@ -441,7 +686,7 @@ $ gdp_capita                        &lt;dbl&gt; 674.7934, 717.3800, 1009.9771, 5
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-19-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-28-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -451,14 +696,14 @@ $ gdp_capita                        &lt;dbl&gt; 674.7934, 717.3800, 1009.9771, 5
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-20-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-29-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-20-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-29-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -480,7 +725,7 @@ alternative hypothesis: stationary</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-22-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-31-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -501,14 +746,14 @@ alternative hypothesis: stationary</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-24-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-33-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-24-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-33-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -556,7 +801,7 @@ Training set -0.08631941</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-26-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-35-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -582,7 +827,7 @@ W = 0.98909, p-value = 0.8701</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-27-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-36-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -626,14 +871,14 @@ W = 0.88402, p-value = 3.614e-05</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-29-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-38-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-29-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-38-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -643,7 +888,7 @@ W = 0.88402, p-value = 3.614e-05</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-30-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-39-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -651,8 +896,8 @@ W = 0.88402, p-value = 3.614e-05</code></pre>
 <p>To finally determine that the model does not predict correctly the test values, we check the error measures:</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code>         Model         ME      RMSE       MPE       MAE     MAPE
-1 ARIMA(0,2,1) -0.2497739 0.2614052 -4.577223 0.2497739 4.577223</code></pre>
+<pre><code>         Model        ME     RMSE      MPE      MAE    MAPE
+1 ARIMA(0,2,1) -68.47054 70.10365 -28.7617 68.47054 28.7617</code></pre>
 </div>
 </div>
 <p>The ARIMA(<span class="math inline">\(0,2,1\)</span>) model produced a Mean Error of <span class="math inline">\(–0.25\)</span> and a RMSE of <span class="math inline">\(0.26\)</span> on the log-transformed test set, indicating a mild tendency to overestimate. The MPE and MAPE were <span class="math inline">\(–4.58\)</span>% and <span class="math inline">\(4.58\)</span>%, respectively. These values suggest that, on average, the model overpredicts tuberculosis deaths by approximately <span class="math inline">\(4.6\)</span>%.</p>
@@ -661,30 +906,30 @@ W = 0.88402, p-value = 3.614e-05</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>     Point Forecast    Lo 95    Hi 95
 2011       5.971262 5.715572 6.144812
-2012       5.971262 5.574513 6.195961
-2013       5.971262 5.542679 6.248741
-2014       5.971262 5.496438 6.300178
-2015       5.971262 5.465450 6.331402
-2016       5.971262 5.442164 6.367508
-2017       5.971262 5.375082 6.399018
-2018       5.971262 5.351576 6.431541
-2019       5.971262 5.328955 6.460990
-2020       5.971262 5.290279 6.496572
-2021       5.971262 5.294164 6.519892</code></pre>
+2012       5.971262 5.603351 6.192083
+2013       5.971262 5.555346 6.239952
+2014       5.971262 5.502585 6.293725
+2015       5.971262 5.471047 6.335999
+2016       5.971262 5.444060 6.361413
+2017       5.971262 5.414223 6.395578
+2018       5.971262 5.376789 6.437973
+2019       5.971262 5.342871 6.478578
+2020       5.971262 5.305757 6.514279
+2021       5.971262 5.275565 6.538093</code></pre>
 </div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-33-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-42-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-33-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-42-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -692,8 +937,8 @@ W = 0.88402, p-value = 3.614e-05</code></pre>
 <p>The model has predicted a constant line, indicating that it is not a good model for the data. To assess formally this fact, we study the error measures on the test set.</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code>         Model         ME      RMSE       MPE       MAE     MAPE
-1 ARIMA(0,1,0) -0.4632568 0.4937955 -8.516931 0.4632568 8.516931</code></pre>
+<pre><code>         Model        ME     RMSE       MPE      MAE     MAPE
+1 ARIMA(0,1,0) -141.8182 147.6396 -61.32746 141.8182 61.32746</code></pre>
 </div>
 </div>
 <p>The ARIMA(<span class="math inline">\(0,1,0\)</span>) model yields relatively poor forecast performance, with a high RMSE of <span class="math inline">\(0.49\)</span> and a MAPE of <span class="math inline">\(8.52\)</span>% on the log-transformed test set. The negative ME and MPE values indicate a consistent overestimation of tuberculosis deaths, suggesting that the model fails to adequately capture the underlying downward trend.</p>
@@ -728,7 +973,7 @@ AIC: -97.24188 </code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-36-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-45-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -753,32 +998,26 @@ W = 0.94445, p-value = 0.008611</code></pre>
 <p>Now, we begin the forecast:</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code>     Point Forecast    Lo 95    Hi 95
-2011       5.963683 5.773824 6.153541
-2012       5.905125 5.625066 6.185184
-2013       5.897868 5.536752 6.258983
-2014       5.839725 5.404023 6.275427
-2015       5.832786 5.322479 6.343092
-2016       5.775054 5.192366 6.357742
-2017       5.768429 5.111700 6.425158
-2018       5.711104 4.981288 6.440919
-2019       5.704788 4.899751 6.509825
-2020       5.647867 4.768036 6.527697
-2021       5.641857 4.684961 6.598753</code></pre>
+<pre><code>Time Series:
+Start = 2011 
+End = 2021 
+Frequency = 1 
+ [1] 5.963683 5.905125 5.897868 5.839725 5.832786 5.775054 5.768429 5.711104
+ [9] 5.704788 5.647867 5.641857</code></pre>
 </div>
 </div>
 <div class="cell">
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-38-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-47-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-38-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-47-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -786,8 +1025,8 @@ W = 0.94445, p-value = 0.008611</code></pre>
 <p>The plot shows how a higher order of the parameters, starts to capture the oscillating behavior of the series. Let’s check the error measures of the test data:</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code>         Model        ME      RMSE       MPE      MAE     MAPE
-1 ARIMA(2,1,2) -0.281839 0.2959692 -5.167253 0.281839 5.167253</code></pre>
+<pre><code>         Model        ME     RMSE       MPE      MAE     MAPE
+1 ARIMA(2,1,2) -78.50731 80.62235 -33.10781 78.50731 33.10781</code></pre>
 </div>
 </div>
 <p>The ARIMA(<span class="math inline">\(2,1,2\)</span>) model exhibits a slight overestimation bias but maintains moderate error magnitude (RMSE = <span class="math inline">\(0.296\)</span>, MAE = <span class="math inline">\(0.282\)</span>) on the log scale. Its MPE of <span class="math inline">\(–5.17\)</span>% and MAPE of <span class="math inline">\(5.17\)</span>% indicate forecasts deviate by just over <span class="math inline">\(5\)</span>% from actual values, reflecting a reasonable balance between accuracy and complexity.</p>
@@ -796,7 +1035,7 @@ W = 0.94445, p-value = 0.008611</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-40-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-49-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -805,25 +1044,47 @@ W = 0.94445, p-value = 0.008611</code></pre>
 <p>Let’s do a summary of the Spain models applied; we are going to change the scale into the original one.</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code>         Model         ME      RMSE       MPE       MAE     MAPE
-1 ARIMA(0,2,1)  -68.47054  70.10365 -28.76170  68.47054 28.76170
-2 ARIMA(0,1,0) -141.81818 147.63961 -61.32746 141.81818 61.32746
-3 ARIMA(2,1,2)  -78.50731  80.62235 -33.10781  78.50731 33.10781</code></pre>
+<pre><code>         Model        ME     RMSE       MPE      MAE     MAPE
+1 ARIMA(0,2,1) -68.47054 70.10365 -28.76170 68.47054 28.76170
+2 ARIMA(2,1,2) -78.50731 80.62235 -33.10781 78.50731 33.10781</code></pre>
 </div>
 </div>
 <p>The out‐of‐sample comparison on the original (untransformed) scale shows that ARIMA(<span class="math inline">\(0,2,1\)</span>) achieves the lowest overall error among the three candidates. Specifically, its RMSE of <span class="math inline">\(70.10\)</span> and MAE of <span class="math inline">\(68.47\)</span> indicate smaller average forecast deviations compared to ARIMA(0,1,0) (RMSE = <span class="math inline">\(147.64\)</span>, MAE = <span class="math inline">\(141.82\)</span>) and ARIMA(2,1,2) (RMSE = <span class="math inline">\(80.62\)</span>, MAE = <span class="math inline">\(78.51\)</span>). In percentage terms, ARIMA(<span class="math inline">\(0,2,1\)</span>) yields a MAPE of <span class="math inline">\(28.76\)</span>%, which is nearly half of ARIMA(<span class="math inline">\(0,1,0\)</span>)’s <span class="math inline">\(61.33\)</span>% and substantially better than ARIMA(<span class="math inline">\(2,1,2\)</span>)’s <span class="math inline">\(33.11\)</span>%. Although all three models exhibit a modest overestimation bias (negative ME and MPE), ARIMA(<span class="math inline">\(0,2,1\)</span>) overpredicts by an average of only <span class="math inline">\(68\)</span> deaths (<span class="math inline">\(–28.76\)</span>% relative bias), whereas ARIMA(<span class="math inline">\(0,1,0\)</span>) and ARIMA(<span class="math inline">\(2,1,2\)</span>) overestimate by <span class="math inline">\(142\)</span> (<span class="math inline">\(–61.33\)</span>%) and <span class="math inline">\(79\)</span> (<span class="math inline">\(–33.11\)</span>%) deaths, respectively.</p>
-<p>Taken together, these results demonstrate that ARIMA(<span class="math inline">\(0,2,1\)</span>) best balances predictive accuracy for tuberculosis mortality in Spain.. Consequently, ARIMA(<span class="math inline">\(0,2,1\)</span>) is the preferred model for forecasting this series.</p>
+<p>Taken together, these results demonstrate that ARIMA(<span class="math inline">\(0,2,1\)</span>) best balances predictive accuracy for tuberculosis mortality in Spain. Consequently, ARIMA(<span class="math inline">\(0,2,1\)</span>) is the preferred model for forecasting this series.</p>
 <div class="cell">
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-43-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-51-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
 <p>Although ARIMA(<span class="math inline">\(0,2,1\)</span>) achieved the lowest numerical errors, its fitted trajectory clearly overestimates the true decline in TB deaths (see the plot). However, because the forecast curve from ARIMA(<span class="math inline">\(0,2,1\)</span>) decays too gradually and remains well above the actual values after 2015, it fails to capture the accelerated drop in mortality.</p>
 <p>In light of this discrepancy between numerical error metrics and visual fit, ARIMA(<span class="math inline">\(0,2,1\)</span>) does not adequately reproduce the sharp downturn observed in the test period. Therefore, despite its lower AIC and error measures, ARIMA(<span class="math inline">\(0,2,1\)</span>) is not optimal.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-52-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-52-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-52-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
 </section>
 <section id="the-netherlands" class="level3">
 <h3 class="anchored" data-anchor-id="the-netherlands">The Netherlands</h3>
@@ -832,7 +1093,7 @@ W = 0.94445, p-value = 0.008611</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-44-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-53-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -842,14 +1103,14 @@ W = 0.94445, p-value = 0.008611</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-45-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-54-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-45-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-54-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -870,14 +1131,14 @@ alternative hypothesis: stationary</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-47-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-56-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-47-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-56-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -907,7 +1168,7 @@ Training set -0.07012464</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-49-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-58-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -947,7 +1208,7 @@ AIC=-45.68   AICc=-42.85   BIC=-28.92</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-51-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-60-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -973,17 +1234,17 @@ W = 0.98246, p-value = 0.5298</code></pre>
 <div class="cell-output cell-output-stdout">
 <pre><code>     Point Forecast    Lo 95    Hi 95
 2011       3.929448 3.647110 4.281337
-2012       3.869913 3.481879 4.378548
-2013       3.810377 3.333824 4.431376
-2014       3.750842 3.190723 4.430539
-2015       3.691306 3.058758 4.437174
-2016       3.631770 2.925802 4.482767
-2017       3.572235 2.803913 4.455371
-2018       3.512699 2.695971 4.431522
-2019       3.453163 2.589038 4.418984
-2020       3.393628 2.478667 4.380006
-2021       3.334092 2.366982 4.398560
-2022       3.274557 2.271449 4.409471</code></pre>
+2012       3.869913 3.490644 4.380832
+2013       3.810377 3.333899 4.434558
+2014       3.750842 3.184044 4.456723
+2015       3.691306 3.045524 4.466524
+2016       3.631770 2.941059 4.447270
+2017       3.572235 2.817928 4.424470
+2018       3.512699 2.706360 4.429354
+2019       3.453163 2.595534 4.405748
+2020       3.393628 2.484554 4.385046
+2021       3.334092 2.386686 4.385811
+2022       3.274557 2.285704 4.380047</code></pre>
 </div>
 <div class="cell-output cell-output-stdout">
 <pre><code>   Point Forecast    Lo 95    Hi 95
@@ -1005,23 +1266,14 @@ W = 0.98246, p-value = 0.5298</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-53-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-62-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-53-2.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-54-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-62-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1030,7 +1282,16 @@ W = 0.98246, p-value = 0.5298</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-55-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-63-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-64-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1074,7 +1335,7 @@ AIC=-46.91   AICc=-41.41   BIC=-23.87</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-58-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-67-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1083,7 +1344,7 @@ AIC=-46.91   AICc=-41.41   BIC=-23.87</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-59-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-68-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1103,12 +1364,35 @@ AIC=-46.91   AICc=-41.41   BIC=-23.87</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-62-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-71-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
 <p>However, despite its lower numerical error metrics, the ARIMA(0,1,0) curve (purple dashed line) clearly fails to follow the actual year‐to‐year fluctuations in TB deaths. It smooths the decline too uniformly, missing the mid‐series uptick around test year 10 and exaggerating death counts early on. In contrast, both ARIMA(4,1,3) (red) and ARIMA(7,1,3) (green) better capture the changing slope and occasional rebounds, demonstrating that a slightly more complex ARIMA structure more faithfully reproduces the true dynamics.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-72-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-72-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-72-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
 </section>
 <section id="bulgaria" class="level3">
 <h3 class="anchored" data-anchor-id="bulgaria">Bulgaria</h3>
@@ -1117,7 +1401,7 @@ AIC=-46.91   AICc=-41.41   BIC=-23.87</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-63-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-73-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1127,14 +1411,14 @@ AIC=-46.91   AICc=-41.41   BIC=-23.87</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-64-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-74-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-64-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-74-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1176,7 +1460,7 @@ Training set 0.07537416</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-67-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-77-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1218,14 +1502,14 @@ W = 0.98861, p-value = 0.9188</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-69-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-79-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-69-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-79-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1243,7 +1527,7 @@ W = 0.98861, p-value = 0.9188</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-71-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-81-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1274,7 +1558,7 @@ Training set -0.1126777</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-73-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-83-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1316,14 +1600,14 @@ W = 0.97825, p-value = 0.508</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-75-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-85-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-75-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-85-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1341,7 +1625,7 @@ W = 0.97825, p-value = 0.508</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-77-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-87-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1418,7 +1702,7 @@ Training set -0.06150391</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-80-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-90-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1460,7 +1744,7 @@ W = 0.98473, p-value = 0.7801</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-82-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-92-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1478,7 +1762,7 @@ W = 0.98473, p-value = 0.7801</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-84-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-94-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1498,7 +1782,409 @@ W = 0.98473, p-value = 0.7801</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-87-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-97-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-98-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-98-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-98-3.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+</section>
+<section id="estonia" class="level3">
+<h3 class="anchored" data-anchor-id="estonia">Estonia</h3>
+<p>Now, we study Estonia data.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   region_code region_name subregion country_code country_name year
+1           EU      Europe         E          EST      Estonia 1981
+2           EU      Europe         E          EST      Estonia 1982
+3           EU      Europe         E          EST      Estonia 1985
+4           EU      Europe         E          EST      Estonia 1986
+5           EU      Europe         E          EST      Estonia 1987
+6           EU      Europe         E          EST      Estonia 1988
+7           EU      Europe         E          EST      Estonia 1989
+8           EU      Europe         E          EST      Estonia 1990
+9           EU      Europe         E          EST      Estonia 1991
+10          EU      Europe         E          EST      Estonia 1992
+11          EU      Europe         E          EST      Estonia 1993
+12          EU      Europe         E          EST      Estonia 1994
+13          EU      Europe         E          EST      Estonia 1995
+14          EU      Europe         E          EST      Estonia 1996
+15          EU      Europe         E          EST      Estonia 1997
+16          EU      Europe         E          EST      Estonia 1998
+17          EU      Europe         E          EST      Estonia 1999
+18          EU      Europe         E          EST      Estonia 2000
+19          EU      Europe         E          EST      Estonia 2001
+20          EU      Europe         E          EST      Estonia 2002
+21          EU      Europe         E          EST      Estonia 2003
+22          EU      Europe         E          EST      Estonia 2004
+23          EU      Europe         E          EST      Estonia 2005
+24          EU      Europe         E          EST      Estonia 2006
+25          EU      Europe         E          EST      Estonia 2007
+26          EU      Europe         E          EST      Estonia 2008
+27          EU      Europe         E          EST      Estonia 2009
+28          EU      Europe         E          EST      Estonia 2010
+29          EU      Europe         E          EST      Estonia 2011
+   number_deaths percent_cause_specific_death_rate age_death_rate death_rate
+1             99                         0.5395389       5.629188   6.684673
+2            105                         0.5868217       5.896735   7.049819
+3             96                         0.4963036       5.070517   6.319947
+4             73                         0.4058712       3.828511   4.765013
+5             63                         0.3446578       3.233547   4.073715
+6             81                         0.4366341       4.160213   5.193639
+7             54                         0.2913250       2.925148   3.443590
+8             69                         0.3532845       3.717204   4.397218
+9             69                         0.3499873       3.683111   4.419354
+10            78                         0.3875584       4.173912   5.087761
+11           105                         0.4932820       5.570508   7.027510
+12           143                         0.6437962       7.679317   9.777684
+13           154                         0.7393893       8.812668  10.719501
+14           148                         0.7781283       8.403848  10.454975
+15           148                         0.7971561       8.502354  10.574941
+16           145                         0.7456546       8.896536  10.460583
+17           149                         0.8074130       8.421116  10.831212
+18           106                         0.5759930       6.342114   7.587769
+19            99                         0.5346727       5.278363   7.131974
+20            88                         0.4794334       5.099150   6.379817
+21            95                         0.5233583       5.481386   6.930664
+22           100                         0.5654510       5.670047   7.339180
+23            51                         0.2945253       2.801189   3.764463
+24            67                         0.3869254       3.744848   4.974718
+25            63                         0.3618818       3.403560   4.699108
+26            55                         0.3298351       2.917253   4.113410
+27            49                         0.3043667       2.384792   3.671746
+28            41                         0.2598061       2.017521   3.079292
+29            45                         0.2959747       2.191062   3.389986
+   population gdp_capita
+1     1485343         NA
+2     1494911         NA
+3     1525281         NA
+4     1535594         NA
+5     1547259         NA
+6     1559099         NA
+7     1567590         NA
+8     1570310         NA
+9     1565380         NA
+10    1540213         NA
+11    1504344   2685.909
+12    1475716   2819.126
+13    1452776   3134.390
+14    1434655   3380.926
+15    1421494   3682.952
+16    1411206   4093.392
+17    1403579   4140.937
+18    1397001   4070.609
+19    1388174   4505.858
+20    1379438   5341.629
+21    1370849   7203.523
+22    1362682   8914.104
+23    1354847  10412.644
+24    1346884  12639.400
+25    1340709  16744.584
+26    1337078  18204.966
+27    1334528  14711.735
+28    1331450  14663.045
+29    1327366  17487.805</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-99-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In order to stabilize the variance of the series, we will work with the logarithmic data.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Augmented Dickey-Fuller Test
+
+data:  train_estonia
+Dickey-Fuller = -2.1342, Lag order = 3, p-value = 0.5211
+alternative hypothesis: stationary</code></pre>
+</div>
+</div>
+<p>The <span class="math inline">\(p\)</span>-value of the ADF test is higher than <span class="math inline">\(0,05\)</span>, so the series is non-stationary. We check both ACF and PACF plots.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-101-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-101-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The ACF shows an exponential decay, while the PACF shows a single significant spike at lag 1. This suggest an AR(<span class="math inline">\(1\)</span>) process. However, the series is not stationary (as seen in the plot, and justified by the ADF test, with a <span class="math inline">\(p\)</span>-value of <span class="math inline">\(0.543\)</span>).</p>
+<p>Let’s see which ARIMA order proposes the auto.arima() function.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_estonia 
+ARIMA(1,0,0) with non-zero mean 
+
+Coefficients:
+         ar1    mean
+      0.7566  4.4785
+s.e.  0.1086  0.1613
+
+sigma^2 = 0.06084:  log likelihood = 0.01
+AIC=5.97   AICc=6.86   BIC=10.27
+
+Training set error measures:
+                       ME      RMSE       MAE        MPE     MAPE     MASE
+Training set -0.004146472 0.2385708 0.1852981 -0.4067951 4.277218 1.030578
+                  ACF1
+Training set 0.0736098</code></pre>
+</div>
+</div>
+<p>The model proposed is an ARIMA(1,0,0) with non-zero mean. We need to further study the residuals of the model.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-103-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(1,0,0) with non-zero mean
+Q* = 1.1115, df = 5, p-value = 0.9531
+
+Model df: 1.   Total lags used: 6</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_estonia_auto)
+W = 0.96119, p-value = 0.3137</code></pre>
+</div>
+</div>
+<p>The residuals seem to pass both Ljung-Box test and Shapiro-Wilk normality test. Now, we can forecast.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2012       4.611258 4.127813 5.094703
+2013       4.578951 3.972733 5.185168
+2014       4.554508 3.888119 5.220898
+2015       4.536016 3.837513 5.234519
+2016       4.522025 3.805788 5.238262
+2017       4.511440 3.785247 5.237633
+2018       4.503431 3.771600 5.235262
+2019       4.497372 3.762334 5.232411
+2020       4.492788 3.755920 5.229657
+2021       4.489320 3.751407 5.227234
+2022       4.486697 3.748185 5.225208</code></pre>
+</div>
+</div>
+<p>We can plot the results:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-105-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-105-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s check the error measures of the test data:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>         Model        ME    RMSE       MPE      MAE     MAPE
+1 ARIMA(1,0,0) -1.609447 1.65553 -58.46415 1.609447 58.46415</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-107-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>The model seems to have cached the declining trend; however it overestimates the values. Let’s propose a different model. Based on the ADF test, the log-transformed series is not stationary. We begin by checking the ACF and PACF plots of the differenced time series.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Augmented Dickey-Fuller Test
+
+data:  train_estonia %&gt;% diff()
+Dickey-Fuller = -1.8064, Lag order = 3, p-value = 0.647
+alternative hypothesis: stationary</code></pre>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-108-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-108-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Once differenced, the time series does not present any temporal structure left. We study the ARIMA(0,1,0).</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_estonia 
+ARIMA(0,1,0) 
+
+sigma^2 = 0.06583:  log likelihood = -1.76
+AIC=5.52   AICc=5.66   BIC=6.92
+
+Training set error measures:
+                     ME      RMSE       MAE        MPE     MAPE      MASE
+Training set 0.00204631 0.2523997 0.1741485 -0.1289093 4.029889 0.9685663
+                    ACF1
+Training set -0.05117422</code></pre>
+</div>
+</div>
+<p>Let’s check the residuals of the model</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-110-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from ARIMA(0,1,0)
+Q* = 0.70501, df = 6, p-value = 0.9944
+
+Model df: 0.   Total lags used: 6</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_estonia_010)
+W = 0.93813, p-value = 0.07325</code></pre>
+</div>
+</div>
+<p>The residuals seem to pass both Ljung-Box test and Shapiro-Wilk normality test. Now, we can forecast.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2012        4.65396 4.151089 5.156832
+2013        4.65396 3.942792 5.365128
+2014        4.65396 3.782961 5.524960
+2015        4.65396 3.648217 5.659704
+2016        4.65396 3.529505 5.778416
+2017        4.65396 3.422181 5.885739
+2018        4.65396 3.323487 5.984434
+2019        4.65396 3.231625 6.076296
+2020        4.65396 3.145345 6.162575
+2021        4.65396 3.063741 6.244180
+2022        4.65396 2.986124 6.321797</code></pre>
+</div>
+</div>
+<p>Notice that the model has predicted the same value for all years; that is, a constant line. This means that the model does not have fully understood the structure of the series.</p>
+<p>We can plot the results to confirm this behavior:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-112-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p><strong>ARIMA step by step</strong></p>
+<div class="cell">
+<div class="sourceCode cell-code" id="cb90"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb90-1"><a href="#cb90-1" aria-hidden="true" tabindex="-1"></a>h_test <span class="ot">&lt;-</span> <span class="fu">length</span>(test_estonia)</span>
+<span id="cb90-2"><a href="#cb90-2" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-3"><a href="#cb90-3" aria-hidden="true" tabindex="-1"></a>one_step_fc_arima <span class="ot">&lt;-</span> <span class="fu">numeric</span>(h_test)</span>
+<span id="cb90-4"><a href="#cb90-4" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-5"><a href="#cb90-5" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-6"><a href="#cb90-6" aria-hidden="true" tabindex="-1"></a>serie_rolling <span class="ot">&lt;-</span> train_estonia</span>
+<span id="cb90-7"><a href="#cb90-7" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-8"><a href="#cb90-8" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-9"><a href="#cb90-9" aria-hidden="true" tabindex="-1"></a><span class="cf">for</span>(i <span class="cf">in</span> <span class="fu">seq_len</span>(h_test)){</span>
+<span id="cb90-10"><a href="#cb90-10" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-11"><a href="#cb90-11" aria-hidden="true" tabindex="-1"></a>  fit_tmp <span class="ot">&lt;-</span> <span class="fu">Arima</span>(serie_rolling, <span class="at">order =</span> <span class="fu">c</span>(<span class="dv">1</span>,<span class="dv">1</span>,<span class="dv">0</span>))  </span>
+<span id="cb90-12"><a href="#cb90-12" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb90-13"><a href="#cb90-13" aria-hidden="true" tabindex="-1"></a>  fc_tmp  <span class="ot">&lt;-</span> <span class="fu">forecast</span>(fit_tmp, <span class="at">h =</span> <span class="dv">1</span>, <span class="at">level =</span> <span class="dv">95</span>)</span>
+<span id="cb90-14"><a href="#cb90-14" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb90-15"><a href="#cb90-15" aria-hidden="true" tabindex="-1"></a>  one_step_fc_arima[i] <span class="ot">&lt;-</span> fc_tmp<span class="sc">$</span>mean</span>
+<span id="cb90-16"><a href="#cb90-16" aria-hidden="true" tabindex="-1"></a>  </span>
+<span id="cb90-17"><a href="#cb90-17" aria-hidden="true" tabindex="-1"></a>  serie_rolling <span class="ot">&lt;-</span> <span class="fu">c</span>(serie_rolling, test_estonia[i])</span>
+<span id="cb90-18"><a href="#cb90-18" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-19"><a href="#cb90-19" aria-hidden="true" tabindex="-1"></a>  <span class="co">#cat(sprintf("Iter %02d | pred = %.4f | real = %.4f\n", </span></span>
+<span id="cb90-20"><a href="#cb90-20" aria-hidden="true" tabindex="-1"></a>              <span class="co">#i, one_step_fc_arima[i], test_spain[i]))</span></span>
+<span id="cb90-21"><a href="#cb90-21" aria-hidden="true" tabindex="-1"></a>}</span>
+<span id="cb90-22"><a href="#cb90-22" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-23"><a href="#cb90-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-24"><a href="#cb90-24" aria-hidden="true" tabindex="-1"></a>one_step_fc_arima_ts <span class="ot">&lt;-</span> <span class="fu">ts</span>(one_step_fc_arima,</span>
+<span id="cb90-25"><a href="#cb90-25" aria-hidden="true" tabindex="-1"></a>                           <span class="at">start     =</span> <span class="fu">start</span>(test_estonia),</span>
+<span id="cb90-26"><a href="#cb90-26" aria-hidden="true" tabindex="-1"></a>                           <span class="at">frequency =</span> <span class="fu">frequency</span>(test_estonia))</span>
+<span id="cb90-27"><a href="#cb90-27" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-28"><a href="#cb90-28" aria-hidden="true" tabindex="-1"></a>plot_estonia <span class="ot">&lt;-</span> <span class="fu">data.frame</span>(</span>
+<span id="cb90-29"><a href="#cb90-29" aria-hidden="true" tabindex="-1"></a>  <span class="at">Year =</span> <span class="fu">seq_along</span>(test_estonia),</span>
+<span id="cb90-30"><a href="#cb90-30" aria-hidden="true" tabindex="-1"></a>  <span class="at">Actual =</span> <span class="fu">exp</span>(test_estonia),</span>
+<span id="cb90-31"><a href="#cb90-31" aria-hidden="true" tabindex="-1"></a>  <span class="at">Predicted_021 =</span> <span class="fu">exp</span>(one_step_fc_arima_ts)</span>
+<span id="cb90-32"><a href="#cb90-32" aria-hidden="true" tabindex="-1"></a>)</span>
+<span id="cb90-33"><a href="#cb90-33" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-34"><a href="#cb90-34" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb90-35"><a href="#cb90-35" aria-hidden="true" tabindex="-1"></a><span class="fu">ggplot</span>(plot_estonia, <span class="fu">aes</span>(<span class="at">x =</span> Year)) <span class="sc">+</span></span>
+<span id="cb90-36"><a href="#cb90-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y =</span> Actual, <span class="at">color =</span> <span class="st">"Actual"</span>)) <span class="sc">+</span></span>
+<span id="cb90-37"><a href="#cb90-37" aria-hidden="true" tabindex="-1"></a>  <span class="fu">geom_line</span>(<span class="fu">aes</span>(<span class="at">y =</span> Predicted_021, <span class="at">color =</span> <span class="st">"Predicted_021"</span>), <span class="at">linetype =</span> <span class="st">"dashed"</span>) <span class="sc">+</span></span>
+<span id="cb90-38"><a href="#cb90-38" aria-hidden="true" tabindex="-1"></a>  <span class="fu">scale_color_manual</span>(<span class="at">values =</span> <span class="fu">c</span>(<span class="st">"Actual"</span> <span class="ot">=</span> <span class="st">"#1f77b4"</span>, <span class="st">"Predicted_021"</span> <span class="ot">=</span> <span class="st">"#ff7f0e"</span>)) <span class="sc">+</span></span>
+<span id="cb90-39"><a href="#cb90-39" aria-hidden="true" tabindex="-1"></a>  <span class="fu">labs</span>(<span class="at">title =</span> <span class="st">"Actual vs Predicted TB deaths (logarithmic scale)"</span>,</span>
+<span id="cb90-40"><a href="#cb90-40" aria-hidden="true" tabindex="-1"></a>       <span class="at">x =</span> <span class="st">"Year (Test Set)"</span>,</span>
+<span id="cb90-41"><a href="#cb90-41" aria-hidden="true" tabindex="-1"></a>       <span class="at">y =</span> <span class="st">"Number of Deaths"</span>,</span>
+<span id="cb90-42"><a href="#cb90-42" aria-hidden="true" tabindex="-1"></a>       <span class="at">color =</span> <span class="st">"Legend"</span>) <span class="sc">+</span></span>
+<span id="cb90-43"><a href="#cb90-43" aria-hidden="true" tabindex="-1"></a>  <span class="fu">theme_minimal</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-113-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1514,7 +2200,7 @@ W = 0.98473, p-value = 0.7801</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-89-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-115-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1526,7 +2212,7 @@ W = 0.98473, p-value = 0.7801</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-90-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-116-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1547,14 +2233,14 @@ W = 0.98473, p-value = 0.7801</code></pre>
 </div>
 <p>It is necessary that all variable have the same length; we create a function in order to automate this step.</p>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb71"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb71-1"><a href="#cb71-1" aria-hidden="true" tabindex="-1"></a>slice_country_data <span class="ot">&lt;-</span> <span class="cf">function</span>(country, start_year) {</span>
-<span id="cb71-2"><a href="#cb71-2" aria-hidden="true" tabindex="-1"></a>  df_full <span class="ot">&lt;-</span> country_splits[[country]][[<span class="st">"full"</span>]]</span>
-<span id="cb71-3"><a href="#cb71-3" aria-hidden="true" tabindex="-1"></a>  df_filtered <span class="ot">&lt;-</span> df_full <span class="sc">%&gt;%</span></span>
-<span id="cb71-4"><a href="#cb71-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(year <span class="sc">&gt;=</span> start_year) <span class="sc">%&gt;%</span></span>
-<span id="cb71-5"><a href="#cb71-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">arrange</span>(year)  </span>
-<span id="cb71-6"><a href="#cb71-6" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb71-7"><a href="#cb71-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(df_filtered)</span>
-<span id="cb71-8"><a href="#cb71-8" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb92"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb92-1"><a href="#cb92-1" aria-hidden="true" tabindex="-1"></a>slice_country_data <span class="ot">&lt;-</span> <span class="cf">function</span>(country, start_year) {</span>
+<span id="cb92-2"><a href="#cb92-2" aria-hidden="true" tabindex="-1"></a>  df_full <span class="ot">&lt;-</span> country_splits[[country]][[<span class="st">"full"</span>]]</span>
+<span id="cb92-3"><a href="#cb92-3" aria-hidden="true" tabindex="-1"></a>  df_filtered <span class="ot">&lt;-</span> df_full <span class="sc">%&gt;%</span></span>
+<span id="cb92-4"><a href="#cb92-4" aria-hidden="true" tabindex="-1"></a>    <span class="fu">filter</span>(year <span class="sc">&gt;=</span> start_year) <span class="sc">%&gt;%</span></span>
+<span id="cb92-5"><a href="#cb92-5" aria-hidden="true" tabindex="-1"></a>    <span class="fu">arrange</span>(year)  </span>
+<span id="cb92-6"><a href="#cb92-6" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb92-7"><a href="#cb92-7" aria-hidden="true" tabindex="-1"></a>  <span class="fu">return</span>(df_filtered)</span>
+<span id="cb92-8"><a href="#cb92-8" aria-hidden="true" tabindex="-1"></a>}</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Now, we need to divide these new series into a training and a testing set. We will do the split, ensuring that the 80% of the data is used for training.</p>
 <p>Now that we have prepared the dataset, we can begin the ARIMAX study.</p>
@@ -1565,14 +2251,14 @@ W = 0.98473, p-value = 0.7801</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-96-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-122-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-96-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-122-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1601,7 +2287,7 @@ Training set 0.04935634</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-98-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-124-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1644,14 +2330,14 @@ W = 0.99459, p-value = 0.9982</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-100-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-126-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-100-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-126-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1661,7 +2347,7 @@ W = 0.99459, p-value = 0.9982</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-101-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-127-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1679,14 +2365,14 @@ W = 0.99459, p-value = 0.9982</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-103-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-129-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-103-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-129-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1697,14 +2383,14 @@ W = 0.99459, p-value = 0.9982</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-104-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-130-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-104-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-130-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1715,14 +2401,14 @@ W = 0.99459, p-value = 0.9982</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-105-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-131-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-105-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-131-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1749,7 +2435,7 @@ AIC=-107.89   AICc=-106.49   BIC=-98.43</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-107-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-133-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1792,14 +2478,14 @@ W = 0.9887, p-value = 0.9111</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-109-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-135-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-109-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-135-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1809,7 +2495,7 @@ W = 0.9887, p-value = 0.9111</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-110-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-136-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1837,7 +2523,7 @@ W = 0.9887, p-value = 0.9111</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-114-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-140-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -1850,14 +2536,14 @@ W = 0.9887, p-value = 0.9111</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-115-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-141-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-115-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-141-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2044,7 +2730,7 @@ Training set 0.0002817756</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-117-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-143-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2128,14 +2814,14 @@ W = 0.96887, p-value = 0.1985</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-119-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-145-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-119-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-145-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2145,7 +2831,7 @@ W = 0.96887, p-value = 0.1985</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-120-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-146-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2182,14 +2868,14 @@ alternative hypothesis: stationary</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-123-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-149-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-123-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-149-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2216,21 +2902,21 @@ alternative hypothesis: stationary</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-124-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-150-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-124-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-150-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb94"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb94-1"><a href="#cb94-1" aria-hidden="true" tabindex="-1"></a>fit_arimax_netherlands_222 <span class="ot">&lt;-</span> <span class="fu">Arima</span>(train_netherlands_short, <span class="at">order =</span> <span class="fu">c</span>(<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">2</span>), <span class="at">xreg =</span> <span class="fu">as.matrix</span>(xreg_netherlands_train))</span>
-<span id="cb94-2"><a href="#cb94-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(fit_arimax_netherlands_222)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<div class="sourceCode cell-code" id="cb115"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb115-1"><a href="#cb115-1" aria-hidden="true" tabindex="-1"></a>fit_arimax_netherlands_222 <span class="ot">&lt;-</span> <span class="fu">Arima</span>(train_netherlands_short, <span class="at">order =</span> <span class="fu">c</span>(<span class="dv">2</span>,<span class="dv">2</span>,<span class="dv">2</span>), <span class="at">xreg =</span> <span class="fu">as.matrix</span>(xreg_netherlands_train))</span>
+<span id="cb115-2"><a href="#cb115-2" aria-hidden="true" tabindex="-1"></a><span class="fu">summary</span>(fit_arimax_netherlands_222)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Series: train_netherlands_short 
 Regression with ARIMA(2,2,2) errors 
@@ -2254,7 +2940,7 @@ Training set -0.04055321</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-126-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-152-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2297,14 +2983,14 @@ W = 0.97846, p-value = 0.4757</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-128-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-154-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-128-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-154-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2314,7 +3000,7 @@ W = 0.97846, p-value = 0.4757</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-129-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-155-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2340,7 +3026,7 @@ W = 0.97846, p-value = 0.4757</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-133-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-159-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2353,14 +3039,14 @@ W = 0.97846, p-value = 0.4757</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-134-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-160-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-134-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-160-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2496,7 +3182,7 @@ Training set 0.118152</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-136-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-162-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2564,14 +3250,14 @@ W = 0.96667, p-value = 0.3759</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-138-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-164-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-138-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-164-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2581,7 +3267,7 @@ W = 0.96667, p-value = 0.3759</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-139-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-165-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2610,14 +3296,14 @@ alternative hypothesis: stationary</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-142-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-168-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-142-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-168-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2628,14 +3314,14 @@ alternative hypothesis: stationary</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-143-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-169-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-143-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-169-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2646,14 +3332,14 @@ alternative hypothesis: stationary</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-144-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-170-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-144-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-170-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2679,7 +3365,7 @@ AIC=-50.02   AICc=-47.8   BIC=-42.54</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-146-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-172-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2718,14 +3404,14 @@ W = 0.97186, p-value = 0.5146</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-148-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-174-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-148-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-174-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2735,7 +3421,7 @@ W = 0.97186, p-value = 0.5146</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-149-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-175-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2763,11 +3449,225 @@ W = 0.97186, p-value = 0.5146</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-153-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-179-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 </div>
+</section>
+<section id="estonia-1" class="level3">
+<h3 class="anchored" data-anchor-id="estonia-1">Estonia</h3>
+<p>Let’s begin the study for Estonia data. Remember that Estonia is the country that has shorter time series.</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-180-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-180-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>In this case, as the gdp_capita time series increases over time, both number of deaths and population seem to decay, specially the TB deaths series.</p>
+<p>Let’s fit the auto.arima() first:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   region_code region_name subregion country_code country_name year
+1           EU      Europe         E          EST      Estonia 1993
+2           EU      Europe         E          EST      Estonia 1994
+3           EU      Europe         E          EST      Estonia 1995
+4           EU      Europe         E          EST      Estonia 1996
+5           EU      Europe         E          EST      Estonia 1997
+6           EU      Europe         E          EST      Estonia 1998
+7           EU      Europe         E          EST      Estonia 1999
+8           EU      Europe         E          EST      Estonia 2000
+9           EU      Europe         E          EST      Estonia 2001
+10          EU      Europe         E          EST      Estonia 2002
+11          EU      Europe         E          EST      Estonia 2003
+12          EU      Europe         E          EST      Estonia 2004
+13          EU      Europe         E          EST      Estonia 2005
+14          EU      Europe         E          EST      Estonia 2006
+15          EU      Europe         E          EST      Estonia 2007
+16          EU      Europe         E          EST      Estonia 2008
+17          EU      Europe         E          EST      Estonia 2009
+18          EU      Europe         E          EST      Estonia 2010
+19          EU      Europe         E          EST      Estonia 2011
+20          EU      Europe         E          EST      Estonia 2012
+21          EU      Europe         E          EST      Estonia 2013
+22          EU      Europe         E          EST      Estonia 2014
+23          EU      Europe         E          EST      Estonia 2015
+24          EU      Europe         E          EST      Estonia 2016
+   number_deaths percent_cause_specific_death_rate age_death_rate death_rate
+1            105                         0.4932820       5.570508   7.027510
+2            143                         0.6437962       7.679317   9.777684
+3            154                         0.7393893       8.812668  10.719501
+4            148                         0.7781283       8.403848  10.454975
+5            148                         0.7971561       8.502354  10.574941
+6            145                         0.7456546       8.896536  10.460583
+7            149                         0.8074130       8.421116  10.831212
+8            106                         0.5759930       6.342114   7.587769
+9             99                         0.5346727       5.278363   7.131974
+10            88                         0.4794334       5.099150   6.379817
+11            95                         0.5233583       5.481386   6.930664
+12           100                         0.5654510       5.670047   7.339180
+13            51                         0.2945253       2.801189   3.764463
+14            67                         0.3869254       3.744848   4.974718
+15            63                         0.3618818       3.403560   4.699108
+16            55                         0.3298351       2.917253   4.113410
+17            49                         0.3043667       2.384792   3.671746
+18            41                         0.2598061       2.017521   3.079292
+19            45                         0.2959747       2.191062   3.389986
+20            35                         0.2262005       1.836234   2.632961
+21            25                         0.1626122       1.417332   1.896818
+22            28                         0.1809955       1.196359   2.130015
+23            21                         0.1377682       1.029732   1.597434
+24            27                         0.1755184       1.133144   2.052000
+   population gdp_capita
+1     1504344   2685.909
+2     1475716   2819.126
+3     1452776   3134.390
+4     1434655   3380.926
+5     1421494   3682.952
+6     1411206   4093.392
+7     1403579   4140.937
+8     1397001   4070.609
+9     1388174   4505.858
+10    1379438   5341.629
+11    1370849   7203.523
+12    1362682   8914.104
+13    1354847  10412.644
+14    1346884  12639.400
+15    1340709  16744.584
+16    1337078  18204.966
+17    1334528  14711.735
+18    1331450  14663.045
+19    1327366  17487.805
+20    1322616  17403.205
+21    1317921  19056.002
+22    1314456  20261.067
+23    1314581  17402.038
+24    1315850  18295.343</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>Series: train_estonia_short 
+Regression with ARIMA(1,0,0) errors 
+
+Coefficients:
+         ar1  population  gdp_capita
+      0.6509      0.6868      -0.612
+s.e.  0.2336      0.1356       0.209
+
+sigma^2 = 0.05805:  log likelihood = 1.43
+AIC=5.14   AICc=7.25   BIC=9.85
+
+Training set error measures:
+                     ME      RMSE       MAE        MPE     MAPE     MASE
+Training set 0.01046587 0.2253823 0.1891687 -0.2463974 4.676384 1.116928
+                    ACF1
+Training set -0.06468627</code></pre>
+</div>
+</div>
+<p>The auto.arima has selected the ARIMA(1,0,0) as the model with the AIC coefficient minimized. Let’s check the residuals:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-182-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Ljung-Box test
+
+data:  Residuals from Regression with ARIMA(1,0,0) errors
+Q* = 2.3701, df = 4, p-value = 0.668
+
+Model df: 1.   Total lags used: 5</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>
+    Shapiro-Wilk normality test
+
+data:  residuals(fit_arimax_estonia)
+W = 0.94544, p-value = 0.2154</code></pre>
+</div>
+</div>
+<p>The residuals of the ARIMAX model satisfy both normality and non autocorrelation hypothesis. Now, we begin the forecast:</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>   region_code region_name subregion country_code country_name year
+25          EU      Europe         E          EST      Estonia 2017
+26          EU      Europe         E          EST      Estonia 2018
+27          EU      Europe         E          EST      Estonia 2019
+28          EU      Europe         E          EST      Estonia 2020
+29          EU      Europe         E          EST      Estonia 2021
+30          EU      Europe         E          EST      Estonia 2022
+   number_deaths percent_cause_specific_death_rate age_death_rate death_rate
+25            23                        0.14894444      1.0406808  1.7432298
+26            13                        0.08330129      0.5760393  0.9826747
+27            16                        0.10536020      0.5933051  1.2069569
+28             9                        0.05737600      0.3717036  0.6784593
+29            13                        0.07074830      0.5804094  0.9809951
+30            11                        0.06411377      0.4552843  0.8321293
+   population gdp_capita
+25    1317432   20437.77
+26    1321971   23165.85
+27    1326821   23581.66
+28    1329674   23565.18
+29    1331750   27698.48
+30    1350092   28114.14</code></pre>
+</div>
+<div class="cell-output cell-output-stdout">
+<pre><code>     Point Forecast    Lo 95    Hi 95
+2017       3.359445 2.887204 3.831687
+2018       3.370100 2.806638 3.933563
+2019       3.417038 2.819112 4.014965
+2020       3.454943 2.843001 4.066884
+2021       3.380535 2.762752 3.998319
+2022       3.396065 2.775823 4.016307</code></pre>
+</div>
+</div>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-184-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-184-2.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Let’s plot the predicted versus the actual logarithmic values:</p>
+<div class="cell">
+<div class="cell-output-display">
+<div>
+<figure class="figure">
+<p><img src="TFG_files/figure-html/unnamed-chunk-185-1.png" class="img-fluid figure-img" width="672"></p>
+</figure>
+</div>
+</div>
+</div>
+<p>Finally, we can check the error measures in order to analyze the accuracy of the model.</p>
+<div class="cell">
+<div class="cell-output cell-output-stdout">
+<pre><code>          Model         ME      RMSE       MPE       MAE     MAPE
+1 ARIMAX(1,0,0) -0.7908376 0.8521655 -32.07368 0.7908376 32.07368</code></pre>
+</div>
+</div>
+<p>Summary:</p>
 </section>
 </section>
 <section id="logarithmic-regression" class="level2">
@@ -2806,7 +3706,7 @@ F-statistic:  2950 on 1 and 58 DF,  p-value: &lt; 2.2e-16</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-155-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-188-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2823,14 +3723,14 @@ LM test = 29.705, df = 10, p-value = 0.0009573</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-156-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-189-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-156-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-189-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2862,7 +3762,7 @@ Training set -0.1665804</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-158-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-191-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2903,7 +3803,7 @@ Frequency = 1
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-160-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-193-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2951,7 +3851,7 @@ F-statistic:  1365 on 3 and 46 DF,  p-value: &lt; 2.2e-16</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-163-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-196-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -2969,14 +3869,14 @@ LM test = 29.871, df = 10, p-value = 0.0008992</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-164-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-197-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-164-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-197-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3008,7 +3908,7 @@ Training set -0.160539</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-166-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-199-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3062,7 +3962,7 @@ Frequency = 1
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-168-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-201-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3259,7 +4159,7 @@ F-statistic: 124.5 on 1 and 46 DF,  p-value: 1.117e-14</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-171-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-204-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3276,14 +4176,14 @@ LM test = 41.898, df = 10, p-value = 7.819e-06</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-172-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-205-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-172-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-205-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3315,7 +4215,7 @@ Training set 0.09638889</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-174-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-207-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3356,7 +4256,7 @@ Frequency = 1
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-176-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-209-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3403,7 +4303,7 @@ F-statistic: 20.58 on 3 and 30 DF,  p-value: 1.948e-07</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-179-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-212-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3420,14 +4320,14 @@ LM test = 19.863, df = 7, p-value = 0.005873</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-180-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-213-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-180-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-213-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3437,21 +4337,21 @@ LM test = 19.863, df = 7, p-value = 0.005873</code></pre>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
 <pre><code>Series: complete_bulgaria_residuals 
-ARIMA(1,0,4) with non-zero mean 
+ARIMA(1,0,0) with non-zero mean 
 
 Coefficients:
-         ar1     ma1     ma2      ma3      ma4    mean
-      0.6877  0.0307  0.1444  -0.3590  -0.8161  0.0039
-s.e.  0.1571  0.1405  0.1724   0.1408   0.1577  0.0132
+         ar1     mean
+      0.6725  -0.0186
+s.e.  0.1346   0.0518
 
-sigma^2 = 0.007082:  log likelihood = 35.57
-AIC=-57.14   AICc=-52.83   BIC=-46.46
+sigma^2 = 0.0112:  log likelihood = 28.85
+AIC=-51.69   AICc=-50.89   BIC=-47.11
 
 Training set error measures:
-                       ME       RMSE        MAE       MPE     MAPE      MASE
-Training set -0.002168514 0.07637004 0.06455825 -208.9866 341.3274 0.7133897
-                   ACF1
-Training set 0.03566269</code></pre>
+                      ME      RMSE        MAE      MPE     MAPE      MASE
+Training set 0.001188773 0.1026707 0.08040364 234.5635 254.6002 0.8884863
+                 ACF1
+Training set 0.148239</code></pre>
 </div>
 </div>
 <p>The low AIC value indicates a good fit. We check now the residuals:</p>
@@ -3459,7 +4359,7 @@ Training set 0.03566269</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-182-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-215-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3467,17 +4367,17 @@ Training set 0.03566269</code></pre>
 <pre><code>
     Ljung-Box test
 
-data:  Residuals from ARIMA(1,0,4) with non-zero mean
-Q* = 3.3551, df = 3, p-value = 0.34
+data:  Residuals from ARIMA(1,0,0) with non-zero mean
+Q* = 8.9925, df = 6, p-value = 0.174
 
-Model df: 5.   Total lags used: 8</code></pre>
+Model df: 1.   Total lags used: 7</code></pre>
 </div>
 <div class="cell-output cell-output-stdout">
 <pre><code>
     Shapiro-Wilk normality test
 
 data:  residuals(fit_arima_complete_bulgaria_residuals)
-W = 0.98061, p-value = 0.7919</code></pre>
+W = 0.97683, p-value = 0.6706</code></pre>
 </div>
 </div>
 <p>Now the residuals satisfy the necessary hypothesis. We begin the pronostics.</p>
@@ -3488,26 +4388,26 @@ Start = 35
 End = 42 
 Frequency = 1 
        1        2        3        4        5        6        7        8 
-151.6815 176.0873 199.8392 218.1363 201.9983 193.7491 187.1831 175.4329 </code></pre>
+160.6578 175.6207 178.6995 177.8869 174.4722 174.0471 172.7186 164.8688 </code></pre>
 </div>
 </div>
 <p>Finally, let’s plot the new regression:</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
 <pre><code>  Year Actual Forecast
-1 2014    126 151.6815
-2 2015    114 176.0873
-3 2016    113 199.8392
-4 2017     94 218.1363
-5 2018     95 201.9983
-6 2019    100 193.7491
-7 2020     74 187.1831
-8 2021     54 175.4329</code></pre>
+1 2014    126 160.6578
+2 2015    114 175.6207
+3 2016    113 178.6995
+4 2017     94 177.8869
+5 2018     95 174.4722
+6 2019    100 174.0471
+7 2020     74 172.7186
+8 2021     54 164.8688</code></pre>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-184-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-217-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3515,9 +4415,9 @@ Frequency = 1
 <div class="cell">
 <div class="cell-output cell-output-stdout">
 <pre><code>                                                          Model        ME
-1 log(number_deaths) ~ year + log(population) + log(gdp_capita) -91.76346
-     RMSE       MPE      MAE     MAPE
-1 96.9917 -108.4948 91.76346 108.4948</code></pre>
+1 log(number_deaths) ~ year + log(population) + log(gdp_capita) -76.12146
+      RMSE       MPE      MAE     MAPE
+1 79.20525 -90.67002 76.12146 90.67002</code></pre>
 </div>
 </div>
 </section>
@@ -3743,7 +4643,7 @@ F-statistic: 239.8 on 1 and 59 DF,  p-value: &lt; 2.2e-16</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-187-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-220-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3760,14 +4660,14 @@ LM test = 42.342, df = 10, p-value = 6.519e-06</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-188-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-221-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-188-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-221-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3799,7 +4699,7 @@ Training set -0.1029676</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-190-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-223-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3840,7 +4740,7 @@ Frequency = 1
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-192-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-225-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3886,7 +4786,7 @@ F-statistic:  75.3 on 3 and 47 DF,  p-value: &lt; 2.2e-16</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-195-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-228-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3903,28 +4803,28 @@ LM test = 27.317, df = 10, p-value = 0.00232</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-196-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-229-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-196-2.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-229-2.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-196-3.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-229-3.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-196-4.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-229-4.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3956,7 +4856,7 @@ Training set -0.01261207</code></pre>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-198-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-231-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -3995,7 +4895,7 @@ Frequency = 1
 <div class="cell-output-display">
 <div>
 <figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-200-1.png" class="img-fluid figure-img" width="672"></p>
+<p><img src="TFG_files/figure-html/unnamed-chunk-233-1.png" class="img-fluid figure-img" width="672"></p>
 </figure>
 </div>
 </div>
@@ -4009,204 +4909,6 @@ Frequency = 1
 </div>
 </div>
 </section>
-</section>
-<section id="modeling-regressors-prediction" class="level3">
-<h3 class="anchored" data-anchor-id="modeling-regressors-prediction">Modeling regressors – prediction</h3>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-202-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>We try to fix an ARIMA model using auto.arima()</p>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>Series: ts(log(train_spain_df$population), start = 1951, frequency = 1) 
-ARIMA(4,1,0) with drift 
-
-Coefficients:
-         ar1      ar2     ar3      ar4   drift
-      1.6736  -1.2950  0.8903  -0.4208  0.0080
-s.e.  0.1196   0.2334  0.2429   0.1367  0.0011
-
-sigma^2 = 7.165e-06:  log likelihood = 308.67
-AIC=-605.34   AICc=-603.73   BIC=-592.88
-
-Training set error measures:
-                       ME        RMSE         MAE         MPE       MAPE
-Training set 0.0003003533 0.002539399 0.001111227 0.001756561 0.00639275
-                  MASE        ACF1
-Training set 0.1293403 -0.02464608</code></pre>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-204-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>
-    Ljung-Box test
-
-data:  Residuals from ARIMA(4,1,0) with drift
-Q* = 0.95998, df = 6, p-value = 0.9871
-
-Model df: 4.   Total lags used: 10</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>
-    Shapiro-Wilk normality test
-
-data:  residuals(fit_pop_spain)
-W = 0.49202, p-value = 4.264e-13</code></pre>
-</div>
-</div>
-<p>The residuals pass the Ljung-Box test, but not the normality test.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-205-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-206-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>Now we do the same for gdp per capita.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-207-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<p>We try to fix an ARIMA model using auto.arima()</p>
-<div class="cell">
-<div class="cell-output cell-output-stdout">
-<pre><code>
-Call:
-lm(formula = log(spain_short_train_df$gdp_capita) ~ spain_short_train_df$year)
-
-Residuals:
-    Min      1Q  Median      3Q     Max 
--0.4175 -0.2048 -0.1188  0.2535  0.5670 
-
-Coefficients:
-                            Estimate Std. Error t value Pr(&gt;|t|)    
-(Intercept)               -1.652e+02  5.469e+00  -30.22   &lt;2e-16 ***
-spain_short_train_df$year  8.758e-02  2.756e-03   31.79   &lt;2e-16 ***
----
-Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-
-Residual standard error: 0.2812 on 48 degrees of freedom
-Multiple R-squared:  0.9546,    Adjusted R-squared:  0.9537 
-F-statistic:  1010 on 1 and 48 DF,  p-value: &lt; 2.2e-16</code></pre>
-</div>
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-208-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>
-    Breusch-Godfrey test for serial correlation of order up to 10
-
-data:  Residuals
-LM test = 42.226, df = 10, p-value = 6.836e-06</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Series: residuals(lm(log(spain_short_train_df$gdp_capita) ~ spain_short_train_df$year)) 
-ARIMA(1,0,2) with zero mean 
-
-Coefficients:
-         ar1     ma1     ma2
-      0.7938  0.7108  0.3794
-s.e.  0.1077  0.1774  0.1550
-
-sigma^2 = 0.009345:  log likelihood = 46.03
-AIC=-84.05   AICc=-83.16   BIC=-76.4</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>Series: ts(log(spain_short_train_df$gdp_capita), start = 1960, frequency = 1) 
-ARIMA(1,1,0) with drift 
-
-Coefficients:
-         ar1   drift
-      0.4424  0.0868
-s.e.  0.1304  0.0253
-
-sigma^2 = 0.01049:  log likelihood = 43.03
-AIC=-80.07   AICc=-79.53   BIC=-74.39
-
-Training set error measures:
-                        ME       RMSE        MAE        MPE      MAPE      MASE
-Training set -0.0003185579 0.09931388 0.07314049 0.02688485 0.8460412 0.6034643
-                   ACF1
-Training set 0.07293134</code></pre>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-209-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>
-    Ljung-Box test
-
-data:  Residuals from ARIMA(1,1,0) with drift
-Q* = 9.6767, df = 9, p-value = 0.3773
-
-Model df: 1.   Total lags used: 10</code></pre>
-</div>
-<div class="cell-output cell-output-stdout">
-<pre><code>
-    Shapiro-Wilk normality test
-
-data:  residuals(fit_gdp_spain)
-W = 0.96578, p-value = 0.1551</code></pre>
-</div>
-</div>
-<p>The residuals pass the Ljung-Box test and the normality test.</p>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-210-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
-<div class="cell">
-<div class="cell-output-display">
-<div>
-<figure class="figure">
-<p><img src="TFG_files/figure-html/unnamed-chunk-211-1.png" class="img-fluid figure-img" width="672"></p>
-</figure>
-</div>
-</div>
-</div>
 </section>
 </section>
 
