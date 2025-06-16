@@ -512,12 +512,12 @@ make_horizon_plots <- function(train_series, test_series, fit_fixed_fun, fit_aut
            aes(x = year, y = Value, colour = Model, linetype = Model)) +
       geom_line(na.rm = TRUE) +
       scale_colour_manual(values = c(Actual = "#1f77b4",
-                                     Auto   = "#4daf4a",
+                                     Auto   = "#6ba292",
                                      Fixed  = "#ff7f0e")) +
       scale_linetype_manual(values = c(Actual = "solid",
                                        Auto   = "dashed",
                                        Fixed  = "dashed")) +
-      labs(title = paste("Horizon", substring(h, 2), "years"),
+      labs(title = ,
            x = "Year", y = "Number of deaths",
            colour = "Model", linetype = "Model") +
       theme_minimal(base_size = 13)
@@ -527,6 +527,8 @@ make_horizon_plots <- function(train_series, test_series, fit_fixed_fun, fit_aut
   names(plots) <- paste0("h", horizons)
   plots
 }
+
+#paste("Horizon", substring(h, 2), "years")
 ```
 
 To simplify the generation of plots across countries, we define `make_country_plots()`. This function handles the preprocessing steps, including log-transforming the input series and converting them into time series objects with appropriate start years. It then invokes the plotting function described above and returns a list of plots, one for each horizon.
@@ -640,14 +642,14 @@ plot_rolling_forecast_single <- function(test_ts, preds_log, horizon = 1L) {
   )
 
   ggplot(df, aes(x = Year)) +
-    geom_line(aes(y = Actual, colour = "Actual"), linewidth = 0.8) +
-    geom_line(aes(y = Forecast, colour = "Forecast"), linetype = "dashed",
-              linewidth = 0.8, na.rm = TRUE) +
+    geom_line(aes(y = Actual, colour = "Actual")) +
+    geom_line(aes(y = Forecast, colour = "Forecast"), linetype = "dashed", na.rm = TRUE) +
     scale_colour_manual(values = c(Actual = "#1f77b4", Forecast = "#ff7f0e")) +
-    labs(title = paste("Rolling‑origin forecast – Horizon", horizon, "year(s)"),
+    labs(title = "",
          y = "Number of deaths", colour = "") +
     theme_minimal(base_size = 13)
 }
+#paste("Rolling‑origin forecast – Horizon", horizon, "year(s)")
 ```
 
 
@@ -744,6 +746,9 @@ adf.test(train_spain %>% diff())
 The test $p$-value ensures the stationarity of the time series. Now, we check the ACF and PACF of the differenced time series:
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+custom_acf_plot(train_spain %>% diff())
+custom_pacf_plot(train_spain %>% diff())
 acf(train_spain %>% diff())
 pacf(train_spain %>% diff())
 ```
@@ -810,8 +815,8 @@ Over the one-, three-, and five-step horizons, forecast accuracy steadily deteri
 We will now manually select another model usin the `try_all_arima` function. We choose a 1 order difference, as the series showed stationarity after the differencing.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-ma_coef = c(2,3)
-ar_coef = c(2,3)
+ma_coef = c(0,1)
+ar_coef = c(0,1)
 
 try_all_arima(ar_coef, 1, ma_coef, train_spain)
 ```
@@ -821,12 +826,12 @@ The function shows that the two models with the smallest AIC is the ARIMA($2,1,2
 We check the residuals of the models:
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-fit_spain_212 <- Arima(train_spain, order = c(2,1,2))
+fit_spain_111 <- Arima(train_spain, order = c(1,1,1))
 
-fit_spain_212 %>% 
+fit_spain_111 %>% 
   forecast::checkresiduals()
 
-shapiro.test(residuals(fit_spain_212))
+shapiro.test(residuals(fit_spain_111))
 ```
 
 The residuals of the ARIMA($2,1,2$) do not satisfy normality hypothesis.
@@ -837,7 +842,7 @@ Now, we begin the forecast:
 pred_log <- rolling_predictions_single(
   train_spain,           
   test_spain,            
-  fitting_function(2,1,2),     
+  fitting_function(1,1,1),     
   h_max     = 5,
   horizons  = c(1,3,5)
 )
@@ -851,7 +856,7 @@ Let's check the error measures of the test data:
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
-preds_log <- rolling_predictions_single(train_spain, test_spain, fitting_function(2,1,2))
+preds_log <- rolling_predictions_single(train_spain, test_spain, fitting_function(1,1,1))
 err_tbl <- rolling_error_metrics_single(
   actual_raw = exp(test_spain),
   preds_mat  = exp(preds_log)
@@ -867,7 +872,7 @@ Let's do a summary of the Spain models applied.
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
 
-get_error_metrics("Spain",2,1,2,1951)
+get_error_metrics("Spain",1,1,1,1951)
 
 ```
 
@@ -877,7 +882,7 @@ By h5, the balance changes slightly. Auto still records the lower RMSE (43.3 vs 
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
-make_country_plots("Spain",2,1,2,1951)
+make_country_plots("Spain",1,1,1,1951)
 ```
 
 ### The Netherlands
@@ -937,8 +942,8 @@ adf.test(train_netherlands)
 The training series is not stationary.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-acf(train_netherlands %>% diff())
-pacf(train_netherlands %>% diff())
+custom_acf_plot(train_netherlands %>% diff())
+custom_pacf_plot(train_netherlands %>% diff())
 ```
 
 After apply a first order difference, the series ACF plot shows a significant spike at lag 4, and the PACF plot shows significant spikes at lags 4 and 7. We will begin studying the simplest model and the autogenerate model of auto.arima().
@@ -948,7 +953,7 @@ After apply a first order difference, the series ACF plot shows a significant sp
 fit_netherlands_auto <- auto.arima(train_netherlands )
 summary(fit_netherlands_auto)
 ```
-The auto generated model is the ARIMA(1,0,0).
+The auto generated model is the ARIMA(0,1,0).
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
@@ -1024,17 +1029,18 @@ p2
 ACF and PACF of the log-transformed series.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-acf(train_switzerland)
-pacf(train_switzerland)
+custom_acf_plot(train_switzerland)
+custom_pacf_plot(train_switzerland)
 ```
 
 ADF test to study stationarity.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 adf.test(train_switzerland)
+kpss.test(train_switzerland %>% diff())
 ```
 
-The training series is stationary. The series ACF plot shows an exponential decay, and the PACF plot shows significant spikes at lag 1. We will study the AR(1) model.
+Notably, the series passes the ADF test without differencing, suggesting stationarity. However, the visual inspection reveals a clear downward trend, which contradicts this result and raises concerns about potential non-stationarity. To clarify this discrepancy, we applied the KPSS test, which assumes stationarity as the null hypothesis. The KPSS result ($p$-value of $0.01$) leads us to reject stationarity, thereby supporting the use of first-order differencing before model fitting. 
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
@@ -1051,22 +1057,33 @@ shapiro.test(residuals(fit_switzerland_auto))
 
 The residuals for the autogenerate model do not satisfy the normality hypothesis.
 
+```{r}
+custom_acf_plot(train_switzerland %>% diff())
+custom_pacf_plot(train_switzerland %>% diff())
+```
+
+
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-fit_switzerland_100 <- Arima(train_switzerland, order = c(1,0,0))
-fit_switzerland_100
+
+p <- c(0,1)
+q <- c(0,1)
+
+try_all_arima(p,1,q,train_switzerland)
+fit_switzerland_111 <- Arima(train_switzerland, order = c(1,1,1))
+fit_switzerland_111
 ```
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
-fit_switzerland_100 %>% forecast:: checkresiduals()
-shapiro.test(residuals(fit_switzerland_100))
+fit_switzerland_111 %>% forecast:: checkresiduals()
+shapiro.test(residuals(fit_switzerland_111))
 ```
 
 The residuals of the 1,0,0 model pass the Ljung-Box test but not the normality one.
 
 ```{r}
-make_country_plots("Switzerland", 1,0,0, 1951)
-get_error_metrics("Switzerland", 1,0,0, 1951)
+make_country_plots("Switzerland", 1,1,1, 1951)
+get_error_metrics("Switzerland", 1,1,1, 1951)
 ```
 At every horizon the Auto specification outclasses the Manual one, and the gap widens as you look further ahead.
 
@@ -1128,15 +1145,17 @@ pacf(train_sweden)
 ADF test to study stationarity.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-adf.test(train_sweden)
+adf.test(train_sweden %>% diff())
 ```
 
 The training series is not stationary. 
 
 We need to difference the series.
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-acf(train_sweden %>% diff())
-pacf(train_sweden %>% diff())
+
+custom_acf_plot(train_sweden %>% diff())
+custom_pacf_plot(train_sweden %>% diff())
+
 ```
 
 The series ACF plot a significant first lag, and the PACF plot shows significant spikes at lag 1 and 8.  We will study an ARIMA(1,1,1)
@@ -1156,22 +1175,30 @@ shapiro.test(residuals(fit_sweden_auto))
 
 The residuals for the autogenerate model satisfy the hypothesis.
 
+```{r}
+p <- c(0,1,8)
+q <- c(0,1,8)
+  
+try_all_arima(p,1,q, train_sweden)
+```
+
+
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-fit_switzerland_111 <- Arima(train_sweden, order = c(1,1,1))
-fit_switzerland_111
+fit_sweden_810 <- Arima(train_sweden, order = c(8,1,0))
+fit_sweden_810
 ```
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
-fit_switzerland_111 %>% forecast:: checkresiduals()
-shapiro.test(residuals(fit_switzerland_111))
+fit_sweden_810 %>% forecast:: checkresiduals()
+shapiro.test(residuals(fit_sweden_810))
 ```
 
 The residuals of the 1,0,0 model pass the Ljung-Box test but not the normality one.
 
 ```{r}
-make_country_plots("Sweden", 1,1,1, 1951)
-get_error_metrics("Sweden", 1,1,1, 1951)
+make_country_plots("Sweden", 8,1,0, 1951)
+get_error_metrics("Sweden", 8,1,0, 1951)
 ```
 ### Bulgaria
 
@@ -1225,7 +1252,7 @@ pacf(train_bulgaria)
 The ACF shows an exponential decay, while the PACF shows a single significant spike at lag 1. This suggest an AR($1$) process. However, the series is not stationary (as seen in the plot, and justified by the ADF test, with a $p$-value of 0.05173).
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-adf.test(train_bulgaria)
+adf.test(train_bulgaria %>% diff(differences = 2))
 ```
 
 Let's see which ARIMA order proposes the auto.arima() function.
@@ -1254,8 +1281,9 @@ pred_log <- rolling_predictions_single(
   h_max     = 5,
   horizons  = c(1,3,5)
 )
+plot_rolling_forecast_single(test_bulgaria, pred_log, horizon = 1)
 plot_rolling_forecast_single(test_bulgaria, pred_log, horizon = 3)
-
+plot_rolling_forecast_single(test_bulgaria, pred_log, horizon = 5)
 ```
 
 Let's check the error measures of the test data:
@@ -1278,17 +1306,31 @@ Overall: forecast accuracy deteriorates steadily with longer lead times, and the
 
 To improve accuracy, we will explore an AR(1) structure: the ACF/PACF of the series both suggest a significant lag‐1 dependence, so fitting ARIMA(1,1,0) may better track the curvature in the decline.
 
-```{r, warning=FALSE, message=FALSE, echo = FALSE}
-fit_bulgaria_110 <- Arima(train_bulgaria, order = c(1,1,0))
+```{r}
+custom_acf_plot(train_bulgaria %>% diff())
+custom_pacf_plot(train_bulgaria %>% diff())
 
-summary(fit_bulgaria_110)
+custom_acf_plot(train_bulgaria %>% diff(differences = 2))
+custom_pacf_plot(train_bulgaria %>% diff(differences = 2))
 ```
 
-The AIC has a value of $-73.01$, meaning it could be a good fit. We check the residuals:
+```{r}
+ar_coef = c(0,1)
+ma_coef = c(1)
+try_all_arima(ar_coef, 2, ma_coef, train_bulgaria)
+```
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-fit_bulgaria_110 %>% forecast::checkresiduals()
-shapiro.test(residuals(fit_bulgaria_110))
+fit_bulgaria_021 <- Arima(train_bulgaria, order = c(0,2,1))
+
+summary(fit_bulgaria_021)
+```
+
+The AIC has a value of $-72.35$, meaning it could be a good fit. We check the residuals:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_bulgaria_021 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_bulgaria_021))
 ```
 
 The residuals seem to pass both Ljung-Box test and Shapiro-Wilk normality test. Now, we can forecast.
@@ -1299,7 +1341,7 @@ The residuals seem to pass both Ljung-Box test and Shapiro-Wilk normality test. 
 pred_log <- rolling_predictions_single(
   train_bulgaria,          
   test_bulgaria,            
-  fitting_function(1,1,0),     
+  fitting_function(0,2,1),     
   h_max     = 5,
   horizons  = c(1,3,5)
 )
@@ -1315,7 +1357,7 @@ Let's check the error measures of the logarithmic test data:
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
-preds_log <- rolling_predictions_single(train_bulgaria, test_bulgaria, fitting_function(1,1,0))
+preds_log <- rolling_predictions_single(train_bulgaria, test_bulgaria, fitting_function(0,2,1))
 err_tbl <- rolling_error_metrics_single(
   actual_raw = exp(test_bulgaria),
   preds_mat  = exp(preds_log)
@@ -1336,12 +1378,12 @@ At the **five-step horizon (h5)**, the deterioration becomes dramatic. Bias reac
 Let's do a summary of the Bulgarian models applied.
 
 ```{r}
-make_country_plots("Bulgaria", 1,1,0, 1964)
+make_country_plots("Bulgaria", 0,2,1, 1964)
 ```
 
 
 ```{r}
-get_error_metrics("Bulgaria", 1,1,0, 1964)
+get_error_metrics("Bulgaria", 0,2,1, 1964)
 ```
 
 
@@ -1428,7 +1470,11 @@ pred_log <- rolling_predictions_single(
   h_max     = 5,
   horizons  = c(1,3,5)
 )
+
+plot_rolling_forecast_single(test_estonia, pred_log, horizon = 1)
 plot_rolling_forecast_single(test_estonia, pred_log, horizon = 3)
+plot_rolling_forecast_single(test_estonia, pred_log, horizon = 5)
+
 
 
 ```
@@ -1451,25 +1497,37 @@ print(err_tbl)
 Let's propose a different model. Based on the ADF test, the log-transformed series is not stationary. We begin by checking the ACF and PACF plots of the differenced time series.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-adf.test(train_estonia %>% diff())
+adf.test(train_estonia %>% diff(differences = 2))
 
-acf(train_estonia %>% diff() )
-pacf(train_estonia %>% diff() )
+custom_acf_plot(train_estonia %>% diff())
+custom_pacf_plot(train_estonia %>% diff())
+
+custom_acf_plot(train_estonia %>% diff(differences = 2))
+custom_pacf_plot(train_estonia %>% diff(differences = 2))
+
 ```
 
-Once differenced, the time series does not present any temporal structure left. We study the ARIMA(0,1,0).
+```{r}
+ar_coef = c(1)
+d = c(1,2)
+ma_coef = c(0,1)
+
+try_all_arima(ar_coef,d,ma_coef, train_estonia)
+```
+
+Once differenced, the time series does not present any temporal structure left. We study the ARIMA(1,1,0).
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-fit_estonia_010 <- Arima(train_estonia, order = c(0,1,0))
+fit_estonia_110 <- Arima(train_estonia, order = c(1,1,0))
 
-summary(fit_estonia_010)
+summary(fit_estonia_110)
 ```
 
 Let's check the residuals of the model
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-fit_estonia_010 %>% forecast::checkresiduals()
-shapiro.test(residuals(fit_estonia_010))
+fit_estonia_110 %>% forecast::checkresiduals()
+shapiro.test(residuals(fit_estonia_110))
 ```
 
 The residuals seem to pass both Ljung-Box test and Shapiro-Wilk normality test. Now, we can forecast.
@@ -1479,17 +1537,20 @@ The residuals seem to pass both Ljung-Box test and Shapiro-Wilk normality test. 
 pred_log <- rolling_predictions_single(
   train_estonia,           
   test_estonia,            
-  fitting_function(0,1,0),    
+  fitting_function(1,1,0),    
   h_max     = 5,
   horizons  = c(1,3,5)
 )
+
+plot_rolling_forecast_single(test_estonia, pred_log, horizon = 1)
 plot_rolling_forecast_single(test_estonia, pred_log, horizon = 3)
+plot_rolling_forecast_single(test_estonia, pred_log, horizon = 5)
 
 
 ```
 
 ```{r}
-preds_log <- rolling_predictions_single(train_estonia, test_estonia, fitting_function(0,1,0))
+preds_log <- rolling_predictions_single(train_estonia, test_estonia, fitting_function(1,1,0))
 err_tbl <- rolling_error_metrics_single(
   actual_raw = exp(test_estonia),
   preds_mat  = exp(preds_log)
@@ -1500,12 +1561,131 @@ print(err_tbl)
 Comparison:
 
 ```{r}
-make_country_plots("Estonia", 0,1,0, 1981)
-get_error_metrics("Estonia", 0,1,0, 1981)
+make_country_plots("Estonia", 1,1,0, 1981)
+get_error_metrics("Estonia", 1,1,0, 1981)
 ```
 
 
 ## ARIMAX models
+
+```{r}
+fitting_function_arimax <- function(p, d, q, xreg_train) {
+  function(y, xreg_y) {
+    Arima(y, order = c(p, d, q), xreg = xreg_y)
+  }
+}
+
+fit_auto_arimax <- function(y, xreg) {
+  auto.arima(y, xreg = xreg, stepwise = FALSE, approximation = FALSE)
+}
+
+rolling_forecast_arimax <- function(train_series, test_series,
+                                    xreg_train, xreg_test,
+                                    fitting_function, h_max = 5, horizons = c(1, 3, 5)) {
+  
+  test_len <- length(test_series)
+  confidence_interval <- 95
+  outputs <- matrix(NA_real_, nrow = test_len, ncol = length(horizons),
+                    dimnames = list(NULL, paste0("h", horizons)))
+  
+  rolling_series <- train_series
+  rolling_xreg <- xreg_train
+  
+  for (i in seq_len(test_len)) {
+    
+    model <- fitting_function(rolling_series, rolling_xreg)
+    
+    # Regresores para el pronóstico (h_max futuros)
+    xreg_future <- xreg_test[i:min(i + h_max - 1, nrow(xreg_test)), , drop = FALSE]
+    
+    forecast_vals <- forecast(model, h = nrow(xreg_future), 
+                              xreg = xreg_future,
+                              level = confidence_interval)$mean
+    
+    for (h in horizons) {
+      idx <- i + h - 1
+      if (idx <= test_len)
+        outputs[idx, paste0("h", h)] <- forecast_vals[h]
+    }
+    
+    rolling_series <- c(rolling_series, test_series[i])
+    rolling_xreg <- rbind(rolling_xreg, xreg_test[i, , drop = FALSE])
+  }
+  
+  return(outputs)
+}
+
+
+```
+
+```{r}
+make_horizon_plots_arimax <- function(train_series, test_series,
+                                      xreg_train, xreg_test,
+                                      fit_fixed_fun, fit_auto_fun,
+                                      horizons = c(1,3,5)) {
+  
+  # Rolling forecasts
+  pred_fixed <- rolling_forecast_arimax(
+    train_series, test_series,
+    xreg_train, xreg_test,
+    fitting_function = fit_fixed_fun,
+    h_max = max(horizons), horizons = horizons
+  )
+  
+  pred_auto <- rolling_forecast_arimax(
+    train_series, test_series,
+    xreg_train, xreg_test,
+    fitting_function = fit_auto_fun,
+    h_max = max(horizons), horizons = horizons
+  )
+  
+  # Format predictions
+  df_fixed <- as.data.frame(pred_fixed) %>%
+    mutate(year = time(test_series)) %>%
+    pivot_longer(-year, names_to = "Horizon", values_to = "Value") %>%
+    mutate(Value = exp(as.numeric(Value)),
+           Model = "Fixed")
+  
+  df_auto <- as.data.frame(pred_auto) %>%
+    mutate(year = time(test_series)) %>%
+    pivot_longer(-year, names_to = "Horizon", values_to = "Value") %>%
+    mutate(Value = exp(as.numeric(Value)),
+           Model = "Auto")
+  
+  df_actual <- data.frame(
+    year = time(test_series),
+    Horizon = "Actual",
+    Model = "Actual",
+    Value = exp(as.numeric(test_series))
+  )
+  
+  plot_df <- bind_rows(df_actual, df_fixed, df_auto) %>%
+    mutate(Horizon = factor(Horizon, levels = c("h1", "h3", "h5", "Actual")))
+  
+  make_single_plot <- function(h) {
+    ggplot(filter(plot_df, Horizon == h | Model == "Actual"),
+           aes(x = year, y = Value, colour = Model, linetype = Model)) +
+      geom_line(na.rm = TRUE) +
+      scale_colour_manual(values = c(Actual = "#1f77b4",
+                                     Auto   = "#6ba292",
+                                     Fixed  = "#ff7f0e")) +
+      scale_linetype_manual(values = c(Actual = "solid",
+                                       Auto   = "dashed",
+                                       Fixed  = "dashed")) +
+      labs(title = paste("Forecast horizon:", h),
+           x = "Year", y = "Number of deaths",
+           colour = "Model", linetype = "Model") +
+      theme_minimal(base_size = 13)
+  }
+  
+  plots <- lapply(paste0("h", horizons), make_single_plot)
+  names(plots) <- paste0("h", horizons)
+  return(plots)
+}
+
+```
+
+
 
 We have seen that ARIMA models are quite simple in order to do a well-suited forecast for our studied series. In this section we will study ARIMAX models; ARIMAX models are ARIMA models that include some exogenous variables in order to get better forecastings rather than basic ARIMA. In our study, we will consider two exogenous variables: Gross Domestic Product per capita and the country population.
 
@@ -1690,6 +1870,22 @@ xreg_spain_train <- data.frame(
   population = ts(log(countries_short[["Spain"]][["train"]][["population"]]), start = 1960, frequency = 1),
   gdp_capita = ts(log(countries_short[["Spain"]][["train"]][["gdp_capita"]]), start = 1960, frequency = 1)
 )
+
+
+plots_spain <- make_horizon_plots_arimax(
+  train_series = train_spain_short,
+  test_series  = test_spain_short,
+  xreg_train   = as.matrix(xreg_spain_train),
+  xreg_test    = as.matrix(xreg_spain_test),
+  fit_fixed_fun = fitting_function_arimax(1,1,1, xreg_spain_train), 
+  fit_auto_fun  = fit_auto_arimax
+)
+
+# Visualizar uno de ellos
+plots_spain$h1
+plots_spain$h3
+plots_spain$h5
+
 
 
 fit_arimax_spain <- auto.arima(train_spain_short, xreg= as.matrix(xreg_spain_train ))

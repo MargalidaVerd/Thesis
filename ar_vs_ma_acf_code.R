@@ -1,17 +1,56 @@
 library(forecast)
-
 set.seed(123)
+
+custom_acf_plot <- function(ts_data, max_lag = 25) {
+  acf_vals <- acf(ts_data, plot = FALSE)
+  acf_df <- with(acf_vals, data.frame(
+    Lag = lag,
+    ACF_value = acf
+  ))
+  
+  conf <- qnorm(0.975) / sqrt(length(ts_data))
+  acf_df$UCL <- conf
+  acf_df$LCL <- -conf
+  
+  ggplot(acf_df, aes(x = Lag, y = ACF_value)) +
+    geom_hline(yintercept = 0, color = "#1f77b4") +
+    geom_ribbon(aes(ymin = LCL, ymax = UCL), fill = "#1f77b4", alpha = 0.2) +
+    geom_segment(aes(xend = Lag, yend = 0), color = "#1f77b4") +
+    geom_point(size = 1.5, color = "#1f77b4") +
+    coord_cartesian(ylim = c(-0.5, 1.01)) +
+    scale_y_continuous(breaks = seq(-0.5, 1.01, by = 0.25)) +
+    scale_x_continuous(breaks = seq(0, max_lag, by = 2)) +
+    theme_minimal() +
+    theme(panel.grid = element_blank()) +
+    labs(title = "", x = "Lag", y = "Value")
+}
+custom_pacf_plot <- function(ts_data, max_lag = 25) {
+  pacf_vals <- pacf(ts_data, plot = FALSE)
+  pacf_df <- with(pacf_vals, data.frame(
+    Lag = lag,
+    PACF_value = acf
+  ))
+  
+  conf <- qnorm(0.975) / sqrt(length(ts_data))
+  pacf_df$UCL <- conf
+  pacf_df$LCL <- -conf
+  
+  ggplot(pacf_df, aes(x = Lag, y = PACF_value)) +
+    geom_hline(yintercept = 0, color = "#1f77b4") +
+    geom_ribbon(aes(ymin = LCL, ymax = UCL), fill = "#1f77b4", alpha = 0.2) +
+    geom_segment(aes(xend = Lag, yend = 0), color = "#1f77b4") +
+    geom_point(size = 1.5, color = "#1f77b4") +
+    coord_cartesian(ylim = c(-0.5, 1.01)) +
+    scale_y_continuous(breaks = seq(-0.5, 1.01, by = 0.25)) +
+    scale_x_continuous(breaks = seq(0, max_lag, by = 2)) +
+    theme_minimal() +
+    theme(panel.grid = element_blank()) +
+    labs(title = "", x = "Lag", y = "Value")
+}
 
 ar1_process <- arima.sim(n = 100, model = list(ar = 0.8))
 
-ma2_process <- arima.sim(n = 100, model = list(ma = c(0.5, 0.3)))
+ma1_process <- arima.sim(n = 100, model = list(ma = c(0.8)))
 
-plot_acf_with_points <- function(ts_data, title) {
-  acf_data <- acf(ts_data, plot = FALSE)
-  acf(ts_data, main = title, ylim = c(-1, 1), col = "blue", lwd = 2)
-  points(acf_data$lag, acf_data$acf, col = "red", pch = 19, cex = 0.5)}
-
-  
-plot_acf_with_points(ar1_process, "ACF of AR(1) Process (phi = 0.8)")
-plot_acf_with_points(ma2_process, "ACF of MA(2) Process (theta1 = 0.5, theta2 = 0.3)")
-
+custom_acf_plot(ar1_process)
+custom_acf_plot(ma1_process)
