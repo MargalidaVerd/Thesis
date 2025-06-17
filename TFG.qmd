@@ -2117,8 +2117,7 @@ error_summary <- rolling_error_metrics_single( test_series = exp(test_netherland
 error_summary
 
 ```
-
-The ARIMAX(1,0,3) model yields an ME of –0.66 and an RMSE of 0.70 on the log‐scale, indicating a modest overprediction bias and moderate overall error. Its MPE of –20.53% and MAPE of 20.53% show that predicted values typically exceed actual deaths by around 20% on average, reflecting a reasonably accurate but slightly optimistic fit.
+COMENTAR
 
 Now, let's try to adjust another ARIMAX model, just to try to improve the error measures. The auto.arima() function does not apply any difference to the series; let's check the stationarity of the three series.
 
@@ -2140,23 +2139,25 @@ Both the ACF and PACF show a significant spike at lag 2.
 Now, we difference the other series.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-adf.test(xreg_netherlands_train$population %>% diff(differences = 2))
-adf.test(xreg_netherlands_train$gdp_capita %>% diff(differences = 2))
 
-acf(xreg_netherlands_train$population %>% diff(differences = 2))
-pacf(xreg_netherlands_train$population %>% diff(differences = 2))
+custom_acf_plot(ts(log(countries_short[["Netherlands"]][["train"]][["population"]]), start = 1960, frequency = 1) %>% diff())
+custom_pacf_plot(ts(log(countries_short[["Netherlands"]][["train"]][["population"]]), start = 1960, frequency = 1) %>% diff())
+
+custom_acf_plot(ts(log(countries_short[["Netherlands"]][["train"]][["gdp_capita"]]), start = 1960, frequency = 1) %>% diff())
+custom_pacf_plot(ts(log(countries_short[["Netherlands"]][["train"]][["gdp_capita"]]), start = 1960, frequency = 1) %>% diff())
 
 ```
 
+Fitted model: ARIMA(2,1,2)
 ```{r}
-fit_arimax_netherlands_222 <- Arima(train_netherlands_short, order = c(2,2,2), xreg = as.matrix(xreg_netherlands_train))
-summary(fit_arimax_netherlands_222)
+fit_arimax_netherlands_212 <- Arima(train_netherlands_short, order = c(2,1,2), xreg = xreg_netherlands_train)
+summary(fit_arimax_netherlands_212)
 ```
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-fit_arimax_netherlands_222 %>% forecast::checkresiduals()
+fit_arimax_netherlands_212 %>% forecast::checkresiduals()
 
-shapiro.test(residuals(fit_arimax_netherlands_222))
+shapiro.test(residuals(fit_arimax_netherlands_212))
 ```
 
 The residuals of the ARIMAX model satisfy both normality and non autocorrelation hypothesis. Now, we begin the forecast:
@@ -2164,7 +2165,7 @@ The residuals of the ARIMAX model satisfy both normality and non autocorrelation
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 pred_arimax <- rolling_arimax_predictions_single(train_netherlands_short, test_netherlands_short,
                                                  xreg_netherlands_train, xreg_netherlands_test,
-                                                 fitting_function_arimax(1,1,1))
+                                                 fitting_function_arimax(2,1,2))
 
 
 plot_rolling_forecast_single(test_netherlands_short, pred_arimax, h =1 )
@@ -2187,14 +2188,14 @@ Let's do a summary of the Netherlands models applied; we are going to change the
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
-get_error_metrics_arimax("Netherlands", ,,, 1960, xreg_netherlands_train, xreg_netherlands_test)
+get_error_metrics_arimax("Netherlands", 2,1,2, 1960, xreg_netherlands_train, xreg_netherlands_test)
 
 ```
 
 Finally, we plot both approaches for the test set.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-make_country_plots_arimax("Netherlands", , , 1960)
+make_country_plots_arimax("Netherlands", 2,1 ,2, 1960)
 ```
 
 ### Bulgaria
@@ -2275,8 +2276,7 @@ error_summary
 
 ```
 
-The ARIMAX($1,0,0$) model shows a modest overprediction bias (ME = –0.59) and a moderate overall error (RMSE = 0.65, MAE = 0.59) on the log scale. Its MPE of –13.32% and MAPE of 13.32% indicate that forecasts typically exceed actual values by about 13%, reflecting reasonable fit but still room for improvement.
-
+COMENTAR
 As we see in the plot, the auto.arima function has not fully capture the structure of the series. Let's try to adjust manually another ARIMAX model. First, we need to check if the time series are stationary in the lof-transformed scale.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
@@ -2294,7 +2294,7 @@ custom_pacf_plot(train_bulgaria_short_diff)
 
 The ACF and PACF plots do not show any significant spikes after differencing once the series.
 
-Next, we difference the log(populatioin) time series over the same short training period:
+Next, we difference the log(population) time series over the same short training period:
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 population_bulgaria_diff <- ts(log(countries_short[["Bulgaria"]][["train"]][["population"]]), start = 1980, frequency = 1) %>% diff()
@@ -2303,7 +2303,7 @@ custom_acf_plot(population_bulgaria_diff)
 custom_pacf_plot(population_bulgaria_diff)
 ```
 
-The ACF plot shows a slow exponential decay over the first few lags. In contrast, the PACF shows two large spikes at lags 1 and 2, and then subsequent lags are essentially within the confidence bounds. This pattern is characteristic of an AR($2$) process.
+The ACF plot shows a slow exponential decay over the first few lags. In contrast, the PACF shows two large spikes at lags 1 and 2, and then subsequent lags are essentially within the confidence bounds. This pattern is characteristic of an AR($2$) process or a non-stationary time series.
 
 Finally, we difference the log(gdp_capita) series:
 
@@ -2451,6 +2451,391 @@ Finally, we can check the error measures in order to analyze the accuracy of the
 error_summary <- rolling_error_metrics_single( test_series = exp(test_estonia_short), predictions = exp(pred_arimax))
 error_summary
 ```
+Now, we check the main characteristics of the covariates. We begin with the main series.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+adf.test(ts(log(countries_short[["Estonia"]][["train"]][["number_deaths"]]), start = 1993, frequency = 1))
+
+train_estonia_diff <- ts(log(countries_short[["Estonia"]][["train"]][["number_deaths"]]), start = 1993, frequency = 1) %>% diff()
+
+
+custom_acf_plot(train_estonia_diff)
+custom_pacf_plot(train_estonia_diff)
+```
+
+The series do not present any significant structure left.
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+adf.test(ts(log(countries_short[["Estonia"]][["train"]][["population"]]), start = 1993, frequency = 1))
+
+population_estonia_diff <- ts(log(countries_short[["Estonia"]][["train"]][["population"]]), start = 1993, frequency = 1) %>% diff()
+
+
+custom_acf_plot(population_estonia_diff)
+custom_pacf_plot(population_estonia_diff)
+```
+
+The differenced series ACF and PACF suggest an AR($1$) process.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+adf.test(ts(log(countries_short[["Estonia"]][["train"]][["gdp_capita"]]), start = 1993, frequency = 1))
+
+gdp_capita_estonia_diff <- ts(log(countries_short[["Estonia"]][["train"]][["gdp_capita"]]), start = 1993, frequency = 1) %>% diff()
+
+
+custom_acf_plot(gdp_capita_estonia_diff)
+custom_pacf_plot(gdp_capita_estonia_diff)
+```
+We will study an ARIMA(1,1,0).
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+fit_arimax_estonia_110 <- Arima(train_estonia_short, order = c(1,1,0),xreg= as.matrix(xreg_estonia_train ))
+
+summary(fit_arimax_estonia_110)
+```
+
+Let's check the residuals:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arimax_estonia_110 %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arimax_estonia_110))
+```
+The residuals are well-behaved. We begin the forecast step.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+pred_arimax <- rolling_arimax_predictions_single(train_estonia_short, test_estonia_short,
+                                                 xreg_estonia_train, xreg_estonia_test,
+                                                 fitting_function_arimax(1,1,0))
+
+
+plot_rolling_forecast_single(test_estonia_short, pred_arimax, h =1 )
+plot_rolling_forecast_single(test_estonia_short, pred_arimax, h =3 )
+plot_rolling_forecast_single(test_estonia_short, pred_arimax, h =5 )
+
+```
+We check the error measures.
+
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+error_summary <- rolling_error_metrics_single( test_series = exp(test_estonia_short), predictions = exp(pred_arimax))
+error_summary
+```
+**Final conclusions**
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+get_error_metrics_arimax("Estonia", 1,1,0, 1993, xreg_estonia_train, xreg_estonia_test)
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+make_country_plots_arimax("Estonia", 1,1,0, 1993)
+```
+
+
+### Sweden
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+df_sweden_arimax_plot <- data.frame(
+  Year = countries_short[["Sweden"]][["full"]]$year,
+  number_deaths = countries_short[["Sweden"]][["full"]]$number_deaths,
+  population = countries_short[["Sweden"]][["full"]]$population,
+  gdp_capita = countries_short[["Sweden"]][["full"]]$gdp_capita
+)
+
+
+ggplot(df_sweden_arimax_plot, aes(x = Year)) +
+  geom_line(aes(y = log(number_deaths), color = "number_deaths")) +
+  geom_line(aes(y = log(population), color = "population")) +
+  geom_line(aes(y = log(gdp_capita), color = "gdp_capita")) +
+  geom_vline(xintercept = 2011, linetype = "dashed", color = "#04225CFF") +
+  scale_color_manual(values = c("number_deaths" = "#1f77b4", "population" = "#862633FF", "gdp_capita" = "#088158FF")) +
+  labs(title = "",
+       x = "Year",
+       y = "Log-scaled indicators",
+       color = "Series") +
+  theme_minimal()
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+train_sweden_short <- ts(log(countries_short[["Sweden"]][["train"]][["number_deaths"]]), start = 1960, frequency = 1)
+
+xreg_sweden_train <- as.matrix(data.frame(
+  population = ts(log(countries_short[["Sweden"]][["train"]][["population"]]), start = 1960, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Sweden"]][["train"]][["gdp_capita"]]), start = 1960, frequency = 1)
+))
+
+
+fit_arimax_sweden <- auto.arima(train_sweden_short, xreg= as.matrix(xreg_sweden_train ))
+
+summary(fit_arimax_sweden)
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arimax_sweden %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arimax_sweden))
+```
+
+The residuals of the ARIMAX model do not satisfy the normality hypothesis. Now, we begin the forecast:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_sweden_short <- ts(log(countries_short[["Sweden"]][["test"]][["number_deaths"]]), start = 2011, frequency = 1)
+
+xreg_sweden_test <- as.matrix(data.frame(
+  population = ts(log(countries_short[["Sweden"]][["test"]][["population"]]), start = 2011, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Sweden"]][["test"]][["gdp_capita"]]), start = 2011, frequency = 1)
+))
+
+
+pred_arimax <- rolling_arimax_predictions_single(train_sweden_short, test_sweden_short,
+                                                 xreg_sweden_train, xreg_sweden_test,
+                                                 fit_auto_arimax)
+
+
+plot_rolling_forecast_single(test_sweden_short, pred_arimax, h =1 )
+plot_rolling_forecast_single(test_sweden_short, pred_arimax, h =3 )
+plot_rolling_forecast_single(test_sweden_short, pred_arimax, h =5 )
+
+```
+We can check the error measures in order to analyze the accuracy of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+error_summary <- rolling_error_metrics_single( test_series = exp(test_sweden_short), predictions = exp(pred_arimax))
+error_summary
+
+```
+COMENTAR
+
+Now, let's try to adjust another ARIMAX model, just to try to improve the error measures. The auto.arima() function does not apply any difference to the series; let's check the stationarity of the three series.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+adf.test(train_sweden_short)
+
+adf.test(train_sweden_short %>% diff())
+```
+
+Yet the series is not stationary, when we apply a first order difference it passes the ADF test of stationarity. We an plot the ACf and PACF.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+custom_acf_plot(train_sweden_short %>% diff())
+custom_pacf_plot(train_sweden_short %>% diff())
+```
+
+Neither the ACF nor the PACF show any structure left.
+
+Now, we difference the other series. The ADF test for the population series shows that it is stationary without any differences.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+custom_acf_plot(ts(log(countries_short[["Sweden"]][["train"]][["population"]]), start = 1960, frequency = 1) %>% diff())
+custom_pacf_plot(ts(log(countries_short[["Sweden"]][["train"]][["population"]]), start = 1960, frequency = 1) %>% diff())
+
+custom_acf_plot(ts(log(countries_short[["Sweden"]][["train"]][["gdp_capita"]]), start = 1960, frequency = 1) %>% diff())
+custom_pacf_plot(ts(log(countries_short[["Sweden"]][["train"]][["gdp_capita"]]), start = 1960, frequency = 1) %>% diff())
+
+```
+
+Fitted model: ARIMA(1,1,0)
+```{r}
+fit_arimax_sweden_110 <- Arima(train_sweden_short, order = c(1,1,0), xreg = xreg_sweden_train)
+summary(fit_arimax_sweden_110)
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arimax_sweden_110 %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arimax_sweden_110))
+```
+The residuals of the ARIMAX model do not satisfy the normality hypothesis. Now, we begin the forecast:
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+pred_arimax <- rolling_arimax_predictions_single(train_sweden_short, test_sweden_short,
+                                                 xreg_sweden_train, xreg_sweden_test,
+                                                 fitting_function_arimax(1,1,0))
+
+
+plot_rolling_forecast_single(test_sweden_short, pred_arimax, h =1 )
+plot_rolling_forecast_single(test_sweden_short, pred_arimax, h =3 )
+plot_rolling_forecast_single(test_sweden_short, pred_arimax, h =5 )
+```
+
+Finally, we can check the error measures in order to analyze the accuracy of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+error_summary <- rolling_error_metrics_single( test_series = exp(test_sweden_short), predictions = exp(pred_arimax))
+error_summary
+
+```
+**Final conclusions**
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+get_error_metrics_arimax("Sweden", 1,1,0, 1960, xreg_sweden_train, xreg_sweden_test)
+
+```
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+make_country_plots_arimax("Sweden", 1,1,0, 1960)
+
+```
+
+### Switzerland
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+df_switzerland_arimax_plot <- data.frame(
+  Year = countries_short[["Switzerland"]][["full"]]$year,
+  number_deaths = countries_short[["Switzerland"]][["full"]]$number_deaths,
+  population = countries_short[["Switzerland"]][["full"]]$population,
+  gdp_capita = countries_short[["Switzerland"]][["full"]]$gdp_capita
+)
+
+ggplot(df_switzerland_arimax_plot, aes(x = Year)) +
+  geom_line(aes(y = log(number_deaths), color = "number_deaths")) +
+  geom_line(aes(y = log(population), color = "population")) +
+  geom_line(aes(y = log(gdp_capita), color = "gdp_capita")) +
+  geom_vline(xintercept = 2010, linetype = "dashed", color = "#04225CFF") +
+  scale_color_manual(values = c("number_deaths" = "#1f77b4", "population" = "#862633FF", "gdp_capita" = "#088158FF")) +
+  labs(title = "",
+       x = "Year",
+       y = "Log-scaled indicators",
+       color = "Series") +
+  theme_minimal()
+
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+train_switzerland_short <- ts(log(countries_short[["Switzerland"]][["train"]][["number_deaths"]]), start = 1960, frequency = 1)
+
+xreg_switzerland_train <- as.matrix(data.frame(
+  population = ts(log(countries_short[["Switzerland"]][["train"]][["population"]]), start = 1960, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Switzerland"]][["train"]][["gdp_capita"]]), start = 1960, frequency = 1)
+))
+
+
+fit_arimax_switzerland<- auto.arima(train_switzerland_short, xreg= as.matrix(xreg_switzerland_train ))
+
+summary(fit_arimax_switzerland)
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arimax_switzerland %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arimax_switzerland))
+```
+
+The residuals of the ARIMAX model do not satisfy the normality hypothesis. Now, we begin the forecast:
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+test_switzerland_short <- ts(log(countries_short[["Switzerland"]][["test"]][["number_deaths"]]), start = 2010, frequency = 1)
+
+xreg_switzerland_test <- as.matrix(data.frame(
+  population = ts(log(countries_short[["Switzerland"]][["test"]][["population"]]), start = 2010, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Switzerland"]][["test"]][["gdp_capita"]]), start = 2010, frequency = 1)
+))
+
+
+pred_arimax <- rolling_arimax_predictions_single(train_switzerland_short, test_switzerland_short,
+                                                 xreg_switzerland_train, xreg_switzerland_test,
+                                                 fit_auto_arimax)
+
+
+plot_rolling_forecast_single(test_switzerland_short, pred_arimax, h =1 )
+plot_rolling_forecast_single(test_switzerland_short, pred_arimax, h =3 )
+plot_rolling_forecast_single(test_switzerland_short, pred_arimax, h =5 )
+
+```
+We can check the error measures in order to analyze the accuracy of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+error_summary <- rolling_error_metrics_single( test_series = exp(test_switzerland_short), predictions = exp(pred_arimax))
+error_summary
+
+```
+COMENTAR
+
+Now, let's try to adjust another ARIMAX model, just to try to improve the error measures. The auto.arima() function does not apply any difference to the series; let's check the stationarity of the three series.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+adf.test(train_switzerland_short)
+kpss.test(train_switzerland_short)
+```
+
+The series is not stationary. We can plot the ACf and PACF.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+custom_acf_plot(train_switzerland_short %>% diff())
+custom_pacf_plot(train_switzerland_short %>% diff())
+```
+
+Neither the ACF nor the PACF show any structure left.
+
+Now, we difference the other series. The ADF test for the population series shows that it is stationary without any differences.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+custom_acf_plot(ts(log(countries_short[["Switzerland"]][["train"]][["population"]]), start = 1960, frequency = 1) %>% diff())
+custom_pacf_plot(ts(log(countries_short[["Switzerland"]][["train"]][["population"]]), start = 1960, frequency = 1) %>% diff())
+
+custom_acf_plot(ts(log(countries_short[["Switzerland"]][["train"]][["gdp_capita"]]), start = 1960, frequency = 1) %>% diff())
+custom_pacf_plot(ts(log(countries_short[["Switzerland"]][["train"]][["gdp_capita"]]), start = 1960, frequency = 1) %>% diff())
+
+```
+
+Fitted model: ARIMA(2,1,1)
+```{r}
+fit_arimax_switzerland_211 <- Arima(train_switzerland_short, order = c(2,1,1), xreg = xreg_switzerland_train)
+summary(fit_arimax_switzerland_211)
+```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+fit_arimax_switzerland_211 %>% forecast::checkresiduals()
+
+shapiro.test(residuals(fit_arimax_switzerland_211))
+```
+The residuals of the ARIMAX model do not satisfy the normality hypothesis. Now, we begin the forecast:
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+pred_arimax <- rolling_arimax_predictions_single(train_switzerland_short, test_switzerland_short,
+                                                 xreg_switzerland_train, xreg_switzerland_test,
+                                                 fitting_function_arimax(2,1,1))
+
+
+plot_rolling_forecast_single(test_switzerland_short, pred_arimax, h =1 )
+plot_rolling_forecast_single(test_switzerland_short, pred_arimax, h =3 )
+plot_rolling_forecast_single(test_switzerland_short, pred_arimax, h =5 )
+```
+
+Finally, we can check the error measures in order to analyze the accuracy of the model.
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+error_summary <- rolling_error_metrics_single( test_series = exp(test_switzerland_short), predictions = exp(pred_arimax))
+error_summary
+
+```
+**Final conclusions**
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+get_error_metrics_arimax("Switzerland", 2,1,1, 1960, xreg_switzerland_train, xreg_switzerland_test)
+
+```
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+
+make_country_plots_arimax("Switzerland", 2,1,1, 1960)
+
+```
+
 
 
 
@@ -2488,8 +2873,8 @@ simple_spain_residuals <- ts(residuals(lm_trend_simple_spain), start = 1951, fre
 As we see in the plot, the model has not fully capture the structure of the series, meaning we will need to determine an ARIMA structure for the residuals. We begin by plotting the ACF and PACF.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-acf(simple_spain_residuals)
-pacf(simple_spain_residuals)
+custom_acf_plot(simple_spain_residuals)
+custom_pacf_plot(simple_spain_residuals)
 
 ```
 
