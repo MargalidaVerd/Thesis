@@ -410,42 +410,97 @@ get_length <- function(country, set, variable) {
 
 ```
 
-Now, we begin with the core functions defined for the rolling forecast methodology. We begin by defining two model constructors called `fitting_function()` and `fit_auto()`; the first, takes ARIMA orders $(p,d,q)$ as input and returns a function that fits a model with those parameters to any given time series. The second, fits the `auto.arima()` function, of the forecast package. 
+Now, we begin with the core functions defined for the rolling forecast methodology. We begin by defining a model constructor called `fitting_function()`; it takes ARIMA orders $(p,d,q)$ as input and returns a function that fits a model with those parameters to any given time series. 
 
 ```{r, warning=FALSE, message=FALSE}
-fitting_function <- function(p, d, q) {
-  function(y) Arima(y, order = c(p, d, q))
+fitting_function <- function(order, use_xreg = FALSE) {
+  stopifnot(is.numeric(order) && length(order) == 3)
+  if (use_xreg) {
+    function(y, xreg) {
+      Arima(y, order = order, xreg = as.matrix(xreg))
+    }
+  } else {
+    function(y) Arima(y, order = order)
+  }
 }
-
-fit_auto <- function(y) auto.arima(y, stepwise = FALSE, approximation = FALSE)
 ```
 
 The core of the forecasting mechanism is implemented in the function `rolling_forecast()`.
 
 ```{r, warning=FALSE, message=FALSE, echo=FALSE}
 
-rolling_forecast <- function(train_series, test_series, fitting_function, max_steps = 5, horizons = c(1,3,5)) {
-  
-  test_len <- length(test_series)
-  confidence_interval = 95
-  outputs <- matrix(NA_real_, nrow = test_len, ncol = length(horizons), dimnames = list(NULL, paste0("h", horizons)))
-  
+rolling_forecast_generic <- function(train_series, test_series, order_manual, order_auto, use_xreg = FALSE, xreg_train =
+                                       NULL, xreg_test = NULL, horizons = c(1, 3, 5), conf_level = 95) {
+  max_steps    <- max(horizons)
+  horizons_labels <- paste0("h", horizons)
+  test_len     <- length(test_series)
+
+  predictions_matrix <- function() {
+    matrix(NA_real_, nrow = test_len, ncol = length(horizons), dimnames = list(NULL, horizons_labels))
+    }
+
+  outputs_manual <- list(mean = predictions_matrix(), lower = predictions_matrix(), upper = predictions_matrix())
+  outputs_auto   <- list(mean = predictions_matrix(), lower = predictions_matrix(), upper = predictions_matrix())
+
+  fit_manual <- fitting_function(order_manual, use_xreg)
+  fit_auto   <- fitting_function(order_auto,   use_xreg)
+
   rolling_series <- train_series
-  
+  if (use_xreg) rolling_xreg <- xreg_train
+
   for (i in seq_len(test_len)) {
-    
-    model <- fitting_function(rolling_series)
-    forecast  <- forecast(model, h = max_steps, level = confidence_interval)$mean
-    
-    for (h in horizons) {
-      idx <- i + h - 1
-      if (idx <= test_len)
-        outputs[idx, paste0("h", h)] <- forecast[h]
+    if (use_xreg) {
+      fitted_manual_arima <- fit_manual(rolling_series, rolling_xreg)
+      fitted_auto_arima <- fit_auto  (rolling_series, rolling_xreg)
+
+      xreg_forecasting_window <- xreg_test[i:min(i + max_steps - 1, nrow(xreg_test)), , drop = FALSE]
+
+      forecasted_manual <- forecast(fitted_manual_arima, h = nrow(xreg_forecasting_window), xreg = xreg_forecasting_window, level = conf_level)
+      forecasted_auto <- forecast(fitted_auto_arima, h = nrow(xreg_forecasting_window), xreg = xreg_forecasting_window, level = conf_level)
+    } else {
+      fitted_manual_arima <- fit_manual(rolling_series)
+      fitted_auto_arima <- fit_auto(rolling_series)
+
+      forecasted_manual <- forecast(fitted_manual_arima, h = max_steps, level = conf_level)
+      forecasted_auto <- forecast(fitted_auto_arima, h = max_steps, level = conf_level)
     }
     
+    get_level_column <- function(fc_component) {
+      if (is.null(dim(fc_component))) return(rep(NA_real_, max_steps))
+      level_names <- colnames(fc_component)
+      
+      lvl_idx <- which(level_names == as.character(conf_level))
+      if (length(lvl_idx) == 0) lvl_idx <- 1
+      fc_component[, lvl_idx]
+    }
+
+    mean_manual  <- forecasted_manual$mean
+    lower_manual <- get_level_column(forecasted_manual$lower)
+    upper_manual <- get_level_column(forecasted_manual$upper)
+
+    mean_auto  <- forecasted_auto$mean
+    lower_auto <- get_level_column(forecasted_auto$lower)
+    upper_auto <- get_level_column(forecasted_auto$upper)
+
+    for (h in horizons) {
+      idx <- i + h - 1
+      if (idx <= test_len) {
+        col <- paste0("h", h)
+        outputs_manual$mean [idx, col] <- mean_manual[h]
+        outputs_manual$lower[idx, col] <- lower_manual[h]
+        outputs_manual$upper[idx, col] <- upper_manual[h]
+
+        outputs_auto$mean [idx, col] <- mean_auto[h]
+        outputs_auto$lower[idx, col] <- lower_auto[h]
+        outputs_auto$upper[idx, col] <- upper_auto[h]
+      }
+    }
+
     rolling_series <- c(rolling_series, test_series[i])
+    if (use_xreg) rolling_xreg <- rbind(rolling_xreg, xreg_test[i, , drop = FALSE])
   }
-  return(outputs)
+
+  list(manual = outputs_manual, auto = outputs_auto)
 }
 ```
 
@@ -473,382 +528,127 @@ print(example_tbl, row.names = FALSE)
 To visualize the model behavior at different forecast horizons, the function `make_horizon_plots()` creates a series of time series plots. It takes as input the training and testing series, along with two fitting functions (one for the manually specified model and another using `auto.arima()`), and returns separate plots for each forecast horizon (1, 3, and 5 years). In each plot, the actual data are shown in the original scale, alongside the predictions from both models.
 
 ```{r, warning=FALSE, message=FALSE}
-make_horizon_plots <- function(train_series, test_series, fit_fixed_fun, fit_auto_fun, horizons = c(1,3,5)) {
+plot_horizons <- function(test_log_series, forecast_list, horizons = c(1, 3, 5)) {
   
-  pred_fixed <- rolling_forecast(train_series, test_series, fitting_function = fit_fixed_fun, 
-                                 max_steps = max(horizons), horizons = horizons)
-  
-  pred_auto  <- rolling_forecast(train_series, test_series, fitting_function = fit_auto_fun,
-                                 max_steps = max(horizons), horizons = horizons)
-  
-  df_fixed <- as.data.frame(pred_fixed) %>% 
-    mutate(year = time(test_series)) %>%
-    pivot_longer(-year, names_to = "Horizon", values_to = "Value") %>%
-    mutate(Value = exp(as.numeric(Value)), Model = "Fixed")
-  
-  df_auto  <- as.data.frame(pred_auto)  %>%
-    mutate(year = time(test_series)) %>%
-    pivot_longer(-year, names_to = "Horizon", values_to = "Value") %>%
-    mutate(Value = exp(as.numeric(Value)), Model = "Auto")
-  
-  df_actual <- data.frame(
-    year    = time(test_series),
-    Horizon = "Actual",
-    Model   = "Actual",
-    Value   = exp(as.numeric(test_series))
-  )
-  
-  plot_df <- bind_rows(df_actual, df_fixed, df_auto) %>% 
-    mutate(Horizon = factor(Horizon, levels = c("h1","h3","h5","Actual")))
-  
-  make_single_plot <- function(h) {
-    ggplot(filter(plot_df, Horizon == h | Model == "Actual"),
+  horizons_labels <- paste0("h", horizons)
+  year_vector <- time(test_log_series)
+  test_raw <- exp(as.numeric(test_log_series))
+
+  build_long_df <- function(forecasting_matrix, model_label) {
+    as.data.frame(forecasting_matrix) %>%
+      mutate(year = year_vector) %>%
+      pivot_longer(-year, names_to = "Horizon", values_to = "Value") %>%
+      mutate(Value = exp(as.numeric(Value)), Model = model_label)
+  }
+
+  df_manual <- build_long_df(forecast_list$manual$mean, "manualARIMA")
+  df_auto   <- build_long_df(forecast_list$auto$mean,   "autoARIMA")
+  df_obs    <- data.frame(year = year_vector, Horizon = "Observed", Model = "Observed", Value = test_raw)
+
+  plot_df <- bind_rows(df_obs, df_manual, df_auto) %>%
+    mutate(Horizon = factor(Horizon, levels = c(horizons_labels, "Observed")))
+
+  col_map <- c(Observed = "#1f77b4", autoARIMA = "#6ba292", manualARIMA = "#ff7f0e")
+  lty_map <- c(Observed = "solid",   autoARIMA = "dashed", manualARIMA = "dashed")
+
+  make_single_plot <- function(h_label) {
+    ggplot(filter(plot_df, Horizon == h_label | Model == "Observed"),
            aes(x = year, y = Value, colour = Model, linetype = Model)) +
       geom_line(na.rm = TRUE) +
-      scale_colour_manual(values = c(Actual = "#1f77b4", Auto   = "#6ba292", Fixed  = "#ff7f0e")) +
-      scale_linetype_manual(values = c(Actual = "solid", Auto   = "dashed", Fixed  = "dashed")) +
-      labs(title = , x = "Year", y = "Number of deaths", colour = "Model", linetype = "Model") +
+      scale_colour_manual(values = c(Observed = "#1f77b4", autoARIMA = "#6ba292", manualARIMA = "#ff7f0e")) +
+      scale_linetype_manual(values = c(Observed = "solid",   autoARIMA = "dashed", manualARIMA = "dashed")) +
+      labs(title = "",
+           x = "Year", y = "Number of deaths",
+           colour = "Series", linetype = "Series") +
       theme_minimal(base_size = 13)
   }
-  
-  plots <- lapply(paste0("h", horizons), make_single_plot)
-  names(plots) <- paste0("h", horizons)
+
+  plots <- lapply(horizons_labels, make_single_plot)
+  names(plots) <- horizons_labels
   plots
 }
-
-#paste("Horizon", substring(h, 2), "years")
-```
-
-To simplify the generation of plots across countries, we define `make_country_plots()`. This function handles the preprocessing steps, including log-transforming the input series and converting them into time series objects with appropriate start years. It then invokes the plotting function described above and returns a list of plots, one for each horizon.
-
-```{r, warning=FALSE, message=FALSE}
-
-make_country_plots <- function(country, p, d, q, start_year, horizons = c(1,3,5)) {
-  
-  train_raw <- country_splits[[country]]$train$number_deaths
-  test_raw  <- country_splits[[country]]$test$number_deaths
-  
-  train_ts <- ts(log(train_raw), start= start_year, frequency = 1)
-  test_ts  <- ts(log(test_raw),  start = end(train_ts)[1] + 1, frequency = 1)
-  
-  fit_fixed_fun <- fitting_function(p,d,q)
-  fit_auto_fun  <- function(y) auto.arima(y, stepwise = FALSE, approximation = FALSE)
-  
-  make_horizon_plots(train_ts, test_ts, fit_fixed_fun, fit_auto_fun, horizons = horizons)
-}
+#paste("Forecast horizon:", h_label)
 
 ```
 
-In addition to visual inspection, we provide quantitative tools to assess forecast accuracy. The function `print_error_summary_model()` computes key performance metrics such as Mean Error (ME), Root Mean Squared Error (RMSE), Mean Absolute Error (MAE), Mean Percentage Error (MPE) and Mean Absolute Percentage Error (MAPE).
+In addition to visual inspection, we provide quantitative tools to assess forecast accuracy. The function `compute_accuracy_table()` computes key performance metrics such as Mean Error (ME), Root Mean Squared Error (RMSE), Mean Absolute Error (MAE), Mean Percentage Error (MPE) and Mean Absolute Percentage Error (MAPE).
 
 ```{r, warning=FALSE, message=FALSE}
-
-print_error_summary_model <- function(test_series, predictions_list, horizons = c("h1", "h3", "h5")) {
-  y_orig <- test_series                
-  rows   <- list()
+compute_accuracy_table <- function(test_log, forecast_list, horizons = c(1, 3, 5)) {
   
-  for (model_name in names(predictions_list)) {
-    pred_mat <- predictions_list[[model_name]]
-    
-    for (h in horizons) {
-      yhat <- pred_mat[, h]            
-      keep <- !is.na(yhat)
-      
-      rows[[paste(model_name, h, sep = "_")]] <-
-        data.frame(
-          Model = paste0(model_name, "-", h),
-          ME    = mean(y_orig[keep] - yhat[keep]),
-          RMSE  = rmse(y_orig[keep], yhat[keep]),
-          MAE   = mae (y_orig[keep], yhat[keep]),
-          MAPE  = mape(y_orig[keep], yhat[keep]) * 100,
-          row.names = NULL
-        )
-    }
-  }
-  dplyr::bind_rows(rows)
-}
-```
-
-The function `get_error_metrics()` helps getting the error measures faster.
-
-```{r, warning=FALSE, message=FALSE}
-get_error_metrics <- function(country, p, d, q, start_year, horizons = c(1, 3, 5)) {
-  
-  train_raw <- country_splits[[country]]$train$number_deaths
-  test_raw  <- country_splits[[country]]$test$number_deaths
-  
-  train_log <- ts(log(train_raw), start = start_year, frequency = 1)
-  test_log  <- ts(log(test_raw), start = end(train_log)[1] + 1, frequency = 1)
-  
-  fit_function_fixed <- function(y) Arima(y, order = c(p, d, q))
-  fit_function_auto <- function(y) auto.arima(y, stepwise = FALSE, approximation = FALSE)
-  
-  max_steps <- max(horizons)
-  horizons_char <- paste0("h", horizons)
-  
-  predicted_fixed_log <- rolling_forecast(train_log, test_log, fit_function_fixed, max_steps = max_steps, horizons = horizons)
-  predicted_auto_log  <- rolling_forecast(train_log, test_log, fit_function_auto, max_steps = max_steps, horizons = horizons)
-  
-  error_summary_table <- print_error_summary_model(test_series = test_raw, 
-                                                   predictions_list = list(Manual = exp(predicted_fixed_log), Auto   = exp(predicted_auto_log)),horizons  = horizons_char )
-  
-  return(error_summary_table)
-}
-
-```
-
-If we wish to analyze the performance of one model only, the following functions should help:
-
-```{r, warning=FALSE, message=FALSE}
-
-rolling_predictions_single <- function(train_series, test_series, fitting_function, max_steps = 5, horizons = c(1, 3, 5)) {
-  
-  rolling_forecast(train_series, test_series, fitting_function, max_steps = max_steps, horizons = horizons)
-}
-
-plot_rolling_forecast_single <- function(test_series, predictions_log, horizon = 1) {
-  
-  horizon <- as.integer(horizon)
-  predictions_raw <- exp(predictions_log[, paste0("h", horizon)])
-  
-  df <- data.frame(
-    Year = time(test_series),
-    Actual = exp(as.numeric(test_series)),
-    Forecast = predictions_raw
-  )
-  
-  ggplot(df, aes(x = Year)) +
-    geom_line(aes(y = Actual, colour = "Actual")) +
-    geom_line(aes(y = Forecast, colour = "Forecast"), linetype = "dashed", na.rm = TRUE) +
-    scale_colour_manual(values = c(Actual = "#1f77b4", Forecast = "#ff7f0e")) +
-    labs(title = "", y = "Number of deaths", colour = "") +
-    theme_minimal(base_size = 13)
-}
-#paste("Rolling‑origin forecast – Horizon", horizon, "year(s)")
-```
-
-```{r, warning=FALSE, message=FALSE}
-
-
-rolling_error_metrics_single <- function(test_series, predictions,
-                                         horizons = c("h1", "h3", "h5")) {
-  test_series <- as.numeric(test_series)
+  horizons_labels <- paste0("h", horizons)
   rows <- list()
   
-  for (h in horizons) {
-    predicted_values <- predictions[, h]
+  test_orig <- exp(test_log)
+  
+  for (model_name in names(forecast_list)) {
+    predicted_log <- forecast_list[[model_name]]$mean
+    predicted_orig <- exp(predicted_log)  # ← nombre correcto
     
-    rows[[h]] <- data.frame(
-      Horizon = h,
-      ME    = mean(test_series - predicted_values, na.rm = TRUE),
-      RMSE  = sqrt(mean((test_series - predicted_values)^2, na.rm = TRUE)),
-      MAE   = mean(abs(test_series - predicted_values), na.rm = TRUE),
-      MAPE  = mean(abs((test_series - predicted_values) / test_series), na.rm = TRUE) * 100,
-      row.names = NULL
-    )
+    for (h_lab in horizons_labels) {
+      keep <- !is.na(predicted_orig[, h_lab])
+      rows[[paste(model_name, h_lab, sep = "_")]] <- data.frame(
+        Model = paste0(ifelse(model_name == "auto", "autoARIMA", "manualARIMA"), "-", h_lab),
+        ME    = mean(test_orig[keep] - predicted_orig[keep, h_lab]),
+        RMSE  = rmse(test_orig[keep], predicted_orig[keep, h_lab]),
+        MAE   = mae (test_orig[keep], predicted_orig[keep, h_lab]),
+        MAPE  = mape(test_orig[keep], predicted_orig[keep, h_lab]) * 100,
+        row.names = NULL
+      )
+    }
   }
   
   dplyr::bind_rows(rows)
 }
 ```
 
-## ARIMAX model utilities
-
-Same functions must be adapted for ARIMAX fitting study. 
+Finally, function `run_country_forecast()` helps getting the computed information of a specific country. 
 
 ```{r, warning=FALSE, message=FALSE}
-fitting_function_arimax <- function(p, d, q, xreg_train) {
-  function(y, xreg_y) {
-    Arima(y, order = c(p, d, q), xreg = as.matrix(xreg_y))
+run_country_forecast <- function(country, start_year, order_manual,
+                                 order_auto, horizons = c(1, 3, 5), use_xreg = FALSE) {
+  
+  if (use_xreg) {
+    
+    train_raw <- countries_short[[country]]$train$number_deaths
+    test_raw  <- countries_short[[country]]$test$number_deaths
+
+    train_ts <- ts(log(train_raw), start = start_year, frequency = 1)
+    test_ts  <- ts(log(test_raw),  start = end(train_ts)[1] + 1, frequency = 1)
+
+    xreg_train <- as.matrix(data.frame(
+      population = ts(log(countries_short[[country]]$train$population), start = start_year, frequency = 1),
+      gdp_capita = ts(log(countries_short[[country]]$train$gdp_capita), start = start_year, frequency = 1)
+    ))
+
+    xreg_test <- as.matrix(data.frame(
+      population = ts(log(countries_short[[country]]$test$population), start = end(train_ts)[1] + 1, frequency = 1),
+      gdp_capita = ts(log(countries_short[[country]]$test$gdp_capita), start = end(train_ts)[1] + 1, frequency = 1)
+    ))
+
+    fc_list <- rolling_forecast_generic(train_ts, test_ts, order_manual, order_auto,
+                                        use_xreg = TRUE, xreg_train = xreg_train, xreg_test = xreg_test,
+                                        horizons = horizons)
+  } else {
+    
+    train_raw <- country_splits[[country]]$train$number_deaths
+    test_raw  <- country_splits[[country]]$test$number_deaths
+
+    train_ts <- ts(log(train_raw), start = start_year, frequency = 1)
+    test_ts  <- ts(log(test_raw),  start = end(train_ts)[1] + 1, frequency = 1)
+
+    fc_list <- rolling_forecast_generic(train_ts, test_ts, order_manual, order_auto,
+                                        use_xreg = FALSE, horizons = horizons)
   }
-}
 
-fit_auto_arimax <- function(y, xreg) {
-  auto.arima(y, xreg = as.matrix(xreg))
-}
-```
+  accuracy_tbl <- compute_accuracy_table(test_ts, fc_list, horizons = horizons)
 
+  plots <- plot_horizons(test_ts, fc_list, horizons = horizons)
 
-```{r, warning=FALSE, message=FALSE}
-rolling_forecast_arimax <- function(train_series, test_series,
-                                    xreg_train, xreg_test,
-                                    fitting_function,
-                                    max_steps = 5,
-                                    horizons = c(1, 3, 5)) {
-  
-  test_len <- length(test_series)
-  confidence_interval <- 95
-  outputs <- matrix(NA_real_, nrow = test_len, ncol = length(horizons),
-                    dimnames = list(NULL, paste0("h", horizons)))
-  
-  rolling_series <- train_series
-  rolling_xreg   <- xreg_train
-  
-  for (i in seq_len(test_len)) {
-    
-    # Verificar consistencia de tamaños
-    if (length(rolling_series) != nrow(rolling_xreg)) {
-      stop(sprintf("Length mismatch: y = %d, xreg = %d",
-                   length(rolling_series), nrow(rolling_xreg)))
-    }
-    
-    model <- fitting_function(rolling_series, rolling_xreg)
-    
-    xreg_forecasting <- xreg_test[i:min(i + max_steps - 1, nrow(xreg_test)), , drop = FALSE]
-    
-    forecast_values <- forecast(model,
-                                h = nrow(xreg_forecasting),
-                                xreg = xreg_forecasting,
-                                level = confidence_interval)$mean
-    
-    for (h in horizons) {
-      idx <- i + h - 1
-      if (idx <= test_len) {
-        outputs[idx, paste0("h", h)] <- forecast_values[h]
-      }
-    }
-    
-    # Actualizar rolling
-    rolling_series <- c(rolling_series, test_series[i])
-    rolling_xreg   <- rbind(rolling_xreg, xreg_test[i, , drop = FALSE])
-  }
-  
-  return(outputs)
-}
-
-  
-```
-
-```{r, warning=FALSE, message=FALSE}
-make_horizon_plots_arimax <- function(train_series, test_series, xreg_train, xreg_test, fitting_fixed_function,
-                                      fitting_auto_function,horizons = c(1,3,5)) {
-  
-  pred_fixed <- rolling_forecast_arimax(train_series, test_series, xreg_train, xreg_test, 
-                                        fitting_function =fitting_fixed_function, max_steps = max(horizons), horizons = horizons)
-  
-  pred_auto <- rolling_forecast_arimax(train_series, test_series, xreg_train, xreg_test,
-    fitting_function = fitting_auto_function, max_steps = max(horizons), horizons = horizons)
-  
-  df_fixed <- as.data.frame(pred_fixed) %>%
-    mutate(year = time(test_series)) %>%
-    pivot_longer(-year, names_to = "Horizon", values_to = "Value") %>%
-    mutate(Value = exp(as.numeric(Value)), Model = "Fixed")
-  
-  df_auto <- as.data.frame(pred_auto) %>%
-    mutate(year = time(test_series)) %>%
-    pivot_longer(-year, names_to = "Horizon", values_to = "Value") %>%
-    mutate(Value = exp(as.numeric(Value)), Model = "Auto")
-  
-  df_actual <- data.frame(
-    year = time(test_series),
-    Horizon = "Actual",
-    Model = "Actual",
-    Value = exp(as.numeric(test_series))
-  )
-  
-  plot_df <- bind_rows(df_actual, df_fixed, df_auto) %>%
-    mutate(Horizon = factor(Horizon, levels = c("h1", "h3", "h5", "Actual")))
-  
-  make_single_plot <- function(h) {
-    ggplot(filter(plot_df, Horizon == h | Model == "Actual"), aes(x = year, y = Value, colour = Model, linetype = Model)) +
-      geom_line(na.rm = TRUE) +
-      scale_colour_manual(values = c(Actual = "#1f77b4", Auto   = "#6ba292" , Fixed  = "#ff7f0e")) +
-      scale_linetype_manual(values = c(Actual = "solid", Auto   = "dashed", Fixed  = "dashed")) +
-      labs(title = "",  x = "Year", y = "Number of deaths", colour = "Model", linetype = "Model") +
-      theme_minimal(base_size = 13)
-  }
-  
-  plots <- lapply(paste0("h", horizons), make_single_plot)
-  names(plots) <- paste0("h", horizons)
-  return(plots)
-}
-
-#paste("Forecast horizon:", h)
-
-```
-
-```{r, warning=FALSE, message=FALSE}
-make_country_plots_arimax <- function(country, p, d, q, start_year, horizons = c(1, 3, 5)) {
-  
-  train_raw <- countries_short[[country]]$train$number_deaths
-  test_raw  <- countries_short[[country]]$test$number_deaths
-  
-  train_ts <- ts(log(train_raw), start = start_year, frequency = 1)
-  test_ts  <- ts(log(test_raw),  start = end(train_ts)[1] + 1, frequency = 1)
-  
-  xreg_train <- data.frame(
-    population  = ts(log(countries_short[[country]]$train$population),  start = start_year, frequency = 1),
-    gdp_capita  = ts(log(countries_short[[country]]$train$gdp_capita),  start = start_year, frequency = 1)
-  )
-  
-  xreg_test <- data.frame(
-    population  = ts(log(countries_short[[country]]$test$population),  start = end(train_ts)[1] + 1, frequency = 1),
-    gdp_capita  = ts(log(countries_short[[country]]$test$gdp_capita),  start = end(train_ts)[1] + 1, frequency = 1)
-  )
-  
-  fit_fixed_fun <- function(y, xreg) Arima(y, order = c(p, d, q), xreg = xreg)
-  fit_auto_fun  <- function(y, xreg) auto.arima(y, xreg = xreg, stepwise = FALSE, approximation = FALSE)
-  
-  make_horizon_plots_arimax(train_ts, test_ts, xreg_train = as.matrix(xreg_train),
-                            xreg_test  = as.matrix(xreg_test), fit_fixed_fun, fit_auto_fun, horizons = horizons)
-}
-```
-
-```{r, warning=FALSE, message=FALSE}
-rolling_arimax_predictions_single <- function(train_series, test_series,
-                                              xreg_train, xreg_test,
-                                              fitting_function,
-                                              max_steps = 5,
-                                              horizons = c(1, 3, 5)) {
-  rolling_forecast_arimax(train_series, test_series,
-                          xreg_train, xreg_test,
-                          fitting_function,
-                          max_steps = max_steps,
-                          horizons = horizons)
-}
-```
-
-```{r, warning=FALSE, message=FALSE}
-get_error_metrics_arimax <- function(country, p, d, q, start_year,
-                                     xreg_train, xreg_test,
-                                     horizons = c(1, 3, 5)) {
-  
-  train_raw <- countries_short[[country]]$train$number_deaths
-  test_raw  <- countries_short[[country]]$test$number_deaths
-  
-  train_log <- ts(log(train_raw), start = start_year, frequency = 1)
-  test_log  <- ts(log(test_raw), start = end(train_log)[1] + 1, frequency = 1)
-  
-  fit_function_fixed <- fitting_function_arimax(p, d, q)
-  fit_function_auto  <- function(y, xreg) auto.arima(y, xreg = xreg)
-  
-  max_steps <- max(horizons)
-  horizons_char <- paste0("h", horizons)
-  
-  predicted_fixed_log <- rolling_arimax_predictions_single(train_log, test_log,
-                                                           xreg_train, xreg_test,
-                                                           fitting_function = fit_function_fixed,
-                                                           max_steps = max_steps,
-                                                           horizons = horizons)
-  
-  predicted_auto_log  <- rolling_arimax_predictions_single(train_log, test_log,
-                                                           xreg_train, xreg_test,
-                                                           fitting_function = fit_function_auto,
-                                                           max_steps = max_steps,
-                                                           horizons = horizons)
-  
-  error_summary_table <- print_error_summary_model(test_series = test_raw,
-                                                   predictions_list = list(
-                                                     Manual = exp(predicted_fixed_log),
-                                                     Auto   = exp(predicted_auto_log)
-                                                   ),
-                                                   horizons = horizons_char)
-  
-  return(error_summary_table)
+  list(metrics = accuracy_tbl, plots = plots, forecasts = fc_list)
 }
 
 ```
-
 
 ## ARIMA models
 
@@ -944,34 +744,6 @@ shapiro.test(residuals(fit_spain_auto))
 ```
 
 The ARIMA($0,2,1$) passes both the Ljung-Box test and the Shapiro-Wilk normality test, indicating that the residuals do not present any temporal structure left.
-
-We now proceed with the forecasting stage. 
-
-```{r, warning=FALSE, message=FALSE, echo = FALSE}
-
-pred_log <- rolling_predictions_single(
-  train_spain,           
-  test_spain,            
-  fit_auto,     
-  max_steps = 5,
-  horizons  = c(1,3,5)
-)
-
-plot_rolling_forecast_single(test_spain, pred_log, horizon = 1)
-plot_rolling_forecast_single(test_spain, pred_log, horizon = 3)
-plot_rolling_forecast_single(test_spain, pred_log, horizon = 5)
-
-
-```
-We check the error measures:
-
-```{r, warning=FALSE, message=FALSE, echo = FALSE}
-
-preds_log <- rolling_predictions_single(train_spain, test_spain, fit_auto)
-error_summary <- rolling_error_metrics_single( test_series = exp(test_spain), predictions = exp(preds_log))
-error_summary
-```
-Over the one-, three-, and five-step horizons, forecast accuracy steadily deteriorates: RMSE rises from roughly 34.8 to 43.3, MAE from 25.4 to 34.0, and MAPE from 9.7 % to 14.6 %. At the same time, the mean error shifts from a modest negative bias (−5.6) at h1 to a small positive bias (+3.5) by h5, indicating the model moves from slight over-prediction to slight under-prediction as the horizon lengthens. 
 
 We will now manually select another model usin the `try_all_arima` function. We choose a 1 order difference, as the series showed stationarity after the differencing.
 
