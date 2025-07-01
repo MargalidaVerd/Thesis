@@ -140,9 +140,11 @@ full_dataset <- mortality_dataset %>%
   select(1:10,12) %>% 
   rename(country_name = country_name.x) 
 
+full_dataset <- full_dataset %>% 
+  filter(!(country_name == "Estonia" & year %in% c(1981, 1982)))
+
 full_dataset %>% 
   glimpse()
-
 ```
 
 ## Chosen countries
@@ -150,6 +152,7 @@ full_dataset %>%
 First, we will define the criteria for dividing European countries into six distinct regions: North, South, West, East, Central, and the Balkans. The Balkans have been designated as a separate region due to their significant cultural differences from neighboring countries. We will add a new variable to the dataset that specifies the subregion to which each country belongs.
 
 ```{r, warning=FALSE, message=FALSE, echo= FALSE}
+view(full_dataset)
 
 full_dataset <- full_dataset %>%
   mutate(subregion = case_when(
@@ -277,6 +280,84 @@ full_dataset %>%
   ylab("Number of deaths")
 
 
+full_dataset %>% 
+  filter(country_name %in% c( "Spain", "Sweden", "Netherlands", "Switzerland", "Estonia", "Bulgaria")) %>%  
+  ggplot(aes(x = year, y = log(number_deaths), color = country_name)) +  
+  geom_line() +
+  #coord_cartesian(ylim = c(0,2700)) +
+  scale_color_manual(values = c(
+    "Bulgaria" = "#04A3BDFF",    
+    "Switzerland" = "#F0BE3DFF",    
+    "Estonia" = "#931E18FF",    
+    "Sweden" = "#DA7901FF",   
+    "Spain" = "#247D3FFF",    
+    "Netherlands" = "#20235BFF"    
+  )) + 
+  theme_minimal() +
+  ggtitle("Chosen countries trends")+
+  theme(legend.position = "right") +
+  ylab("Number of deaths")
+
+
+```
+```{r}
+countries <- c("Spain","Sweden","Netherlands",
+               "Switzerland","Estonia","Bulgaria")
+
+colors <- c(
+  "Bulgaria"    = "#04A3BDFF",
+  "Switzerland" = "#F0BE3DFF",
+  "Estonia"     = "#931E18FF",
+  "Sweden"      = "#DA7901FF",
+  "Spain"       = "#247D3FFF",
+  "Netherlands" = "#20235BFF"
+)
+
+base <- full_dataset %>%
+  filter(country_name %in% countries, number_deaths > 0)
+
+p_lin <- ggplot(base, aes(year, number_deaths, colour = country_name)) +
+  geom_line() +
+  coord_cartesian(ylim = c(0, 3000)) +
+  scale_colour_manual(values = colors) +
+  labs(x = "Year", y = "Number of deaths", colour = "Country") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    axis.text  = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    legend.text  = element_text(size = 12),
+    legend.title = element_text(size = 12)
+  )
+
+p_log <- ggplot(base, aes(year, log(number_deaths), colour = country_name)) +
+  geom_line() +
+  scale_colour_manual(values = colors) +
+  labs(x = "Year", y = "Logarithm of the number of deaths", colour = "Country") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    axis.text  = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    legend.text  = element_text(size = 12),
+    legend.title = element_text(size = 12)
+  )
+
+g_legend <- function(a.gplot) {
+  g <- ggplotGrob(a.gplot)
+  gtable::gtable_filter(g, "guide-box")
+}
+
+legend_shared <- g_legend(p_lin)
+
+p_lin_nolegend <- p_lin + theme(legend.position = "none")
+p_log_nolegend <- p_log + theme(legend.position = "none")
+
+grid.arrange(
+  gridExtra::arrangeGrob(p_lin_nolegend, p_log_nolegend, ncol = 2),
+  legend_shared,
+  heights = c(8, 3)
+)
 ```
 
 ## Data partitioning utilities
@@ -349,8 +430,12 @@ custom_acf_plot <- function(ts_data, max_lag = 25) {
     scale_y_continuous(breaks = seq(-0.5, 1.01, by = 0.25)) +
     scale_x_continuous(breaks = seq(0, max_lag, by = 2)) +
     theme_minimal() +
-    theme(panel.grid = element_blank()) +
-    labs(title = "", x = "Lag", y = "Value")
+    theme(
+    panel.grid   = element_blank(),
+    axis.title   = element_text(size = 12), 
+    axis.text    = element_text(size = 12)
+  ) +
+  labs(title = "", x = "Lag", y = "Value")
 }
 
 ```
@@ -376,8 +461,12 @@ custom_pacf_plot <- function(ts_data, max_lag = 25) {
     scale_y_continuous(breaks = seq(-0.5, 1.01, by = 0.25)) +
     scale_x_continuous(breaks = seq(0, max_lag, by = 2)) +
     theme_minimal() +
-    theme(panel.grid = element_blank()) +
-    labs(title = "", x = "Lag", y = "Value")
+    theme(
+    panel.grid   = element_blank(),
+    axis.title   = element_text(size = 12), 
+    axis.text    = element_text(size = 12)
+  ) +
+  labs(title = "", x = "Lag", y = "Value")
 }
 
 ```
@@ -566,7 +655,8 @@ plot_horizons <- function(test_log_series, forecast_list, horizons = c(1, 3, 5))
 
   plots <- lapply(horizons_labels, make_single_plot)
   names(plots) <- horizons_labels
-  plots
+  #plots
+  return(list("plots"=plots, "df"=plot_df))
 }
 #paste("Forecast horizon:", h_label)
 
@@ -819,6 +909,9 @@ calc_exp_bounds(results_arima_spain, "manual",  2)
 calc_exp_bounds(results_arima_spain, "auto",  3)
 calc_exp_bounds(results_arima_spain, "manual",  3)
 ```
+
+
+
 
 ### The Netherlands
 
@@ -1313,15 +1406,16 @@ calc_exp_bounds(results_arima_bulgaria, "manual",  3)
 Finally, Estonia is studied. 
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-train_estonia <- ts(log(country_splits[["Estonia"]]$train$number_deaths), start = 1981, end = 2011,  frequency = 1)
-test_estonia <- ts(log(country_splits[["Estonia"]][["test"]][["number_deaths"]]), start = 2012, frequency = 1)
+adjusted_estonia_data <- country_splits[["Estonia"]]
 
+train_estonia <- ts(log(country_splits[["Estonia"]]$train$number_deaths), start = 1985, end = 2011,  frequency = 1)
+test_estonia <- ts(log(country_splits[["Estonia"]]$test$number_deaths), start = 2012, frequency = 1)
 ```
 
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
-p1 <- plot_ts(ts(log(country_splits[["Estonia"]]$full$number_deaths), start = 1981,  frequency = 1)) +
+p1 <- plot_ts(ts(log(country_splits[["Estonia"]]$full$number_deaths), start = 1985,  frequency = 1)) +
   geom_vline(xintercept = 2012, linetype = "dashed", color = "#1f77b4") +
   theme_minimal() +
   labs(
@@ -1335,7 +1429,7 @@ p1 <- plot_ts(ts(log(country_splits[["Estonia"]]$full$number_deaths), start = 19
     axis.title = element_text(size = 13)
   )
 
-p2 <- plot_ts(ts(country_splits[["Estonia"]]$full$number_deaths, start = 1981, frequency = 1)) +
+p2 <- plot_ts(ts(country_splits[["Estonia"]]$full$number_deaths, start = 1985, frequency = 1)) +
   geom_vline(xintercept = 2012, linetype = "dashed", color = "#1f77b4") +
   theme_minimal() +
   labs(
@@ -1433,10 +1527,17 @@ shapiro.test(residuals(fit_autoarima_estonia))
 We can check the accuracy metric on test data of both models:
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
-results_arima_estonia<- run_country_forecast("Estonia", start_year = 1981, order_manual = c(1,1,0),
+
+results_arima_estonia<- run_country_forecast("Estonia", start_year = 1985, order_manual = c(1,1,0),
                           order_auto = c(0,1,0), horizons = c(1,3,5), use_xreg = FALSE)
 
+
+
+
 results_arima_estonia$metrics   
+
+results_arima_estonia$plots$df
+
 
 ```
 At all forecast horizons, both the manual and automated ARIMA models showed a systematic tendency to over-forecast tuberculosis deaths, as indicated by negative mean errors. However, the extent of over-forecasting was slightly greater for the manual model at each step (e.g., ME –3.3 vs –3.1 at h = 1; –13.4 vs –13.1 at h = 5). Despite this, overall forecast accuracy was generally comparable between the two approaches. The manual ARIMA exhibited marginally lower root mean square errors (RMSE) at h = 3 and h = 5 (10.2 vs 10.1; 13.5 vs 13.3, respectively), while absolute errors (MAE) were nearly identical. Percentage errors (MAPE), however, revealed a clear difference: the manual model yielded consistently lower MAPE at each horizon (e.g., 30.6% vs 34.1% at h = 1), suggesting better relative accuracy in proportion to the observed values. Nevertheless, MAPE values above 50% from h = 3 onward highlight the inherent challenge of longer-term TB mortality forecasting, regardless of model selection strategy.
@@ -1525,6 +1626,69 @@ Now, the outlook is quite different; Switzerland leads the list, climbing from a
 
 Overall, Switzerland, Sweden, and the Netherlands display long-term, high-income growth; Spain shows moderate growth with a plateau post-2008; and the Eastern European countries (Estonia and Bulgaria) demonstrate rapid catch-up following post-1990 transitions.
 
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+countries <- c("Spain","Sweden","Netherlands",
+               "Switzerland","Estonia","Bulgaria")
+
+colors <- c(
+  "Bulgaria"    = "#04A3BDFF",
+  "Switzerland" = "#F0BE3DFF",
+  "Estonia"     = "#931E18FF",
+  "Sweden"      = "#DA7901FF",
+  "Spain"       = "#247D3FFF",
+  "Netherlands" = "#20235BFF"
+)
+
+base2 <- exogenous_variables %>%
+  filter(country_name %in% countries)
+
+p_pop <- ggplot(base2,
+                aes(year, population/1e6, colour = country_name)) +
+  geom_line() +
+  scale_colour_manual(values = colors) +
+  labs(x = "Year", y = "Population (millions)", colour = "Country") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    axis.text  = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    legend.text  = element_text(size = 12),
+    legend.title = element_text(size = 12)
+  )
+
+p_gdp <- ggplot(base2,
+                aes(year, gdp_capita, colour = country_name)) +
+  geom_line() +
+  scale_colour_manual(values = colors) +
+  labs(x = "Year", y = "GDP per capita (USD)", colour = "Country") +
+  theme_minimal(base_size = 13) +
+  theme(
+    legend.position = "bottom",
+    axis.text  = element_text(size = 12),
+    axis.title = element_text(size = 12),
+    legend.text  = element_text(size = 12),
+    legend.title = element_text(size = 12)
+  )
+
+g_legend <- function(a.gplot) {
+  g <- ggplotGrob(a.gplot)
+  gtable::gtable_filter(g, "guide-box")
+}
+
+legend_shared <- g_legend(p_pop)
+
+p_pop_nolegend <- p_pop + theme(legend.position = "none")
+p_gdp_nolegend <- p_gdp + theme(legend.position = "none")
+
+grid.arrange(
+  gridExtra::arrangeGrob(p_pop_nolegend, p_gdp_nolegend, ncol = 2),
+  legend_shared,
+  nrow = 2,
+  heights = c(8, 3)
+)
+```
+
+
 Before beginning the ARIMAX section, it is important to give special attention to the length of each of the variables, just to ensure that the studied variable (number_deaths) length coincides with the covariables length.
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
@@ -1611,6 +1775,8 @@ df_spain_arimax_plot <- data.frame(
   population = countries_short[["Spain"]][["full"]]$population,
   gdp_capita = countries_short[["Spain"]][["full"]]$gdp_capita
 )
+
+df_spain_arimax_plot
 
 train_spain_short <- ts(log(countries_short[["Spain"]][["train"]][["number_deaths"]]), start = 1960, frequency = 1)
 
@@ -1792,7 +1958,60 @@ calc_exp_bounds(results_arimax_spain, "auto",  3)
 calc_exp_bounds(results_arimax_spain, "manual",  3)
 ```
 
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+df1 <- results_arima_spain$plots$df  
 
+df2 <- results_arimax_spain$plots$df
+df1$Type ="ARIMA"
+df2$Type = "ARIMAX"
+
+dfT <- rbind(df1, df2)
+
+observed_data <- dfT %>%
+  filter(Model == "Observed") %>%
+  distinct(year, Value)
+
+hor_types <- expand.grid(
+  Horizon = unique(dfT$Horizon),
+  Type = unique(dfT$Type)
+)
+
+observed_complete <- merge(observed_data, hor_types) %>%
+  mutate(Model = "Observed")
+
+dfT2 <- dfT %>%
+  filter(Model != "Observed") %>%
+  bind_rows(observed_complete)
+
+dfT2 <- dfT2 %>%
+  group_by(Horizon, Type) %>%
+  mutate(models_in_group = n_distinct(Model)) %>%
+  filter(models_in_group > 1) %>%
+  select(-models_in_group) %>%
+  ungroup()
+
+dfT2$Model <- factor(dfT2$Model, levels = c("Observed", "autoARIMA", "manualARIMA"))
+
+colors <- c("Observed" = "#1f77b4", "autoARIMA" = "#6ba292", "manualARIMA" = "#ff7f0e")
+linetypes <- c("Observed" = "solid", "autoARIMA" = "dashed", "manualARIMA" = "dashed")
+
+ggplot(dfT2, aes(x = year, y = Value, color = Model, linetype = Model)) +
+  geom_line() +
+  facet_grid(Horizon ~ Type) +
+  scale_color_manual(values = colors) +
+  scale_linetype_manual(values = linetypes) +
+  labs( x = "Year", y = "Number of deaths",
+       color = "Model", linetype = "Model") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "grey95", linewidth = 0.5),  
+    panel.grid.minor = element_line(color = "grey95", linewidth = 0.2),  
+    strip.text = element_text(),
+    legend.position = "bottom",
+    panel.border = element_rect(color = "grey60", fill = NA, linewidth = 0.3),
+    panel.spacing = unit(0.5, "lines")
+  )
+```
 
 
 ### The Netherlands
@@ -1943,6 +2162,63 @@ results_arimax_netherlands$metrics
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 results_arimax_netherlands$plots
 ```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+df1 <- results_netherlands_arima$plots$df  
+
+df2 <- results_arimax_netherlands$plots$df
+df1$Type ="ARIMA"
+df2$Type = "ARIMAX"
+
+dfT <- rbind(df1, df2)
+
+observed_data <- dfT %>%
+  filter(Model == "Observed") %>%
+  distinct(year, Value)
+
+hor_types <- expand.grid(
+  Horizon = unique(dfT$Horizon),
+  Type = unique(dfT$Type)
+)
+
+observed_complete <- merge(observed_data, hor_types) %>%
+  mutate(Model = "Observed")
+
+dfT2 <- dfT %>%
+  filter(Model != "Observed") %>%
+  bind_rows(observed_complete)
+
+dfT2 <- dfT2 %>%
+  group_by(Horizon, Type) %>%
+  mutate(models_in_group = n_distinct(Model)) %>%
+  filter(models_in_group > 1) %>%
+  select(-models_in_group) %>%
+  ungroup()
+
+dfT2$Model <- factor(dfT2$Model, levels = c("Observed", "autoARIMA", "manualARIMA"))
+
+colors <- c("Observed" = "#1f77b4", "autoARIMA" = "#6ba292", "manualARIMA" = "#ff7f0e")
+linetypes <- c("Observed" = "solid", "autoARIMA" = "dashed", "manualARIMA" = "dashed")
+
+ggplot(dfT2, aes(x = year, y = Value, color = Model, linetype = Model)) +
+  geom_line() +
+  facet_grid(Horizon ~ Type) +
+  scale_color_manual(values = colors) +
+  scale_linetype_manual(values = linetypes) +
+  scale_x_continuous(breaks = seq(min(dfT2$year), max(dfT2$year), by = 3)) +
+  labs( x = "Year", y = "Number of deaths",
+       color = "Model", linetype = "Model") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "grey95", linewidth = 0.5),  
+    panel.grid.minor = element_line(color = "grey95", linewidth = 0.2),  
+    strip.text = element_text(),
+    legend.position = "bottom",
+    panel.border = element_rect(color = "grey60", fill = NA, linewidth = 0.3),
+    panel.spacing = unit(0.5, "lines")
+  )
+```
+
 
 ### Bulgaria
 
@@ -2139,6 +2415,63 @@ calc_exp_bounds(results_arimax_bulgaria, "auto",  3)
 calc_exp_bounds(results_arimax_bulgaria, "manual",  3)
 
 ```
+
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+df1 <- results_arima_bulgaria$plots$df  
+
+df2 <- results_arimax_bulgaria$plots$df
+df1$Type ="ARIMA"
+df2$Type = "ARIMAX"
+
+dfT <- rbind(df1, df2)
+
+observed_data <- dfT %>%
+  filter(Model == "Observed") %>%
+  distinct(year, Value)
+
+hor_types <- expand.grid(
+  Horizon = unique(dfT$Horizon),
+  Type = unique(dfT$Type)
+)
+
+observed_complete <- merge(observed_data, hor_types) %>%
+  mutate(Model = "Observed")
+
+dfT2 <- dfT %>%
+  filter(Model != "Observed") %>%
+  bind_rows(observed_complete)
+
+dfT2 <- dfT2 %>%
+  group_by(Horizon, Type) %>%
+  mutate(models_in_group = n_distinct(Model)) %>%
+  filter(models_in_group > 1) %>%
+  select(-models_in_group) %>%
+  ungroup()
+
+dfT2$Model <- factor(dfT2$Model, levels = c("Observed", "autoARIMA", "manualARIMA"))
+
+colors <- c("Observed" = "#1f77b4", "autoARIMA" = "#6ba292", "manualARIMA" = "#ff7f0e")
+linetypes <- c("Observed" = "solid", "autoARIMA" = "dashed", "manualARIMA" = "dashed")
+
+ggplot(dfT2, aes(x = year, y = Value, color = Model, linetype = Model)) +
+  geom_line() +
+  facet_grid(Horizon ~ Type) +
+  scale_color_manual(values = colors) +
+  scale_linetype_manual(values = linetypes) +
+  scale_x_continuous(breaks = seq(min(dfT2$year), max(dfT2$year), by = 3)) +
+  labs( x = "Year", y = "Number of deaths",
+       color = "Model", linetype = "Model") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "grey95", linewidth = 0.5),  
+    panel.grid.minor = element_line(color = "grey95", linewidth = 0.2),  
+    strip.text = element_text(),
+    legend.position = "bottom",
+    panel.border = element_rect(color = "grey60", fill = NA, linewidth = 0.3),
+    panel.spacing = unit(0.5, "lines")
+  )
+```
+
 ### Estonia
 
 Let's begin the study for Estonia data. Remember that Estonia is the country that has shorter time series.
@@ -2310,7 +2643,9 @@ results_arimax_estonia$metrics
 
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 
-results_arimax_estonia$plots
+results_arimax_estonia$plots$plots$h1
+results_arimax_estonia$plots$plots$h1
+results_arimax_estonia$plots$plots$h1
 
 ```
 
@@ -2325,6 +2660,65 @@ calc_exp_bounds(results_arimax_estonia, "manual",  2)
 calc_exp_bounds(results_arimax_estonia, "auto",  3)
 calc_exp_bounds(results_arimax_estonia, "manual",  3)
 ```
+
+```{r}
+df1_estonia <- results_arima_estonia$plots$df  
+
+df2_estonia <- results_arimax_estonia$plots$df
+
+df1_estonia$Type ="ARIMA"
+df2_estonia$Type = "ARIMAX"
+
+dfT_estonia <- rbind(df1_estonia, df2_estonia)
+
+
+
+observed_data <- dfT_estonia %>%
+  filter(Model == "Observed") %>%
+  distinct(year, Value)
+
+hor_types <- expand.grid(
+  Horizon = unique(dfT_estonia$Horizon),
+  Type = unique(dfT_estonia$Type)
+)
+
+observed_complete <- merge(observed_data, hor_types) %>%
+  mutate(Model = "Observed")
+
+dfT2_estonia <- dfT_estonia %>%
+  filter(Model != "Observed") %>%
+  bind_rows(observed_complete)
+
+dfT2_estonia <- dfT2_estonia %>%
+  group_by(Horizon, Type) %>%
+  mutate(models_in_group = n_distinct(Model)) %>%
+  filter(models_in_group > 1) %>%
+  select(-models_in_group) %>%
+  ungroup()
+
+dfT2_estonia$Model <- factor(dfT2_estonia$Model, levels = c("Observed", "autoARIMA", "manualARIMA"))
+
+colors <- c("Observed" = "#1f77b4", "autoARIMA" = "#6ba292", "manualARIMA" = "#ff7f0e")
+linetypes <- c("Observed" = "solid", "autoARIMA" = "dashed", "manualARIMA" = "dashed")
+
+ggplot(dfT2_estonia, aes(x = year, y = Value, color = Model, linetype = Model)) +
+  geom_line() +
+  facet_grid(Horizon ~ Type) +
+  scale_color_manual(values = colors) +
+  scale_linetype_manual(values = linetypes) +
+  labs( x = "Year", y = "Number of deaths",
+       color = "Model", linetype = "Model") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "grey95", linewidth = 0.5),  
+    panel.grid.minor = element_line(color = "grey95", linewidth = 0.2),  
+    strip.text = element_text(),
+    legend.position = "bottom",
+    panel.border = element_rect(color = "grey60", fill = NA, linewidth = 0.3),
+    panel.spacing = unit(0.5, "lines")
+  )
+```
+
 
 ### Sweden
 
@@ -2485,6 +2879,62 @@ results_arimax_sweden$plots
 
 ```
 
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+df1 <- results_sweden_arima$plots$df  
+
+df2 <- results_arimax_sweden$plots$df
+df1$Type ="ARIMA"
+df2$Type = "ARIMAX"
+
+dfT <- rbind(df1, df2)
+
+observed_data <- dfT %>%
+  filter(Model == "Observed") %>%
+  distinct(year, Value)
+
+hor_types <- expand.grid(
+  Horizon = unique(dfT$Horizon),
+  Type = unique(dfT$Type)
+)
+
+observed_complete <- merge(observed_data, hor_types) %>%
+  mutate(Model = "Observed")
+
+dfT2 <- dfT %>%
+  filter(Model != "Observed") %>%
+  bind_rows(observed_complete)
+
+dfT2 <- dfT2 %>%
+  group_by(Horizon, Type) %>%
+  mutate(models_in_group = n_distinct(Model)) %>%
+  filter(models_in_group > 1) %>%
+  select(-models_in_group) %>%
+  ungroup()
+
+dfT2$Model <- factor(dfT2$Model, levels = c("Observed", "autoARIMA", "manualARIMA"))
+
+colors <- c("Observed" = "#1f77b4", "autoARIMA" = "#6ba292", "manualARIMA" = "#ff7f0e")
+linetypes <- c("Observed" = "solid", "autoARIMA" = "dashed", "manualARIMA" = "dashed")
+
+ggplot(dfT2, aes(x = year, y = Value, color = Model, linetype = Model)) +
+  geom_line() +
+  facet_grid(Horizon ~ Type) +
+  scale_color_manual(values = colors) +
+  scale_linetype_manual(values = linetypes) +
+  scale_x_continuous(breaks = seq(min(dfT2$year), max(dfT2$year), by = 3)) +
+  labs( x = "Year", y = "Number of deaths",
+       color = "Model", linetype = "Model") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "grey95", linewidth = 0.5),  
+    panel.grid.minor = element_line(color = "grey95", linewidth = 0.2),  
+    strip.text = element_text(),
+    legend.position = "bottom",
+    panel.border = element_rect(color = "grey60", fill = NA, linewidth = 0.3),
+    panel.spacing = unit(0.5, "lines")
+  )
+
+```
 
 ### Switzerland
 
@@ -2650,6 +3100,350 @@ results_arimax_switzerland$metrics
 ```{r, warning=FALSE, message=FALSE, echo = FALSE}
 results_arimax_switzerland$plots
 ```
+```{r, warning=FALSE, message=FALSE, echo = FALSE}
+df1 <- results_switzerland_arima$plots$df  
+
+df2 <- results_arimax_switzerland$plots$df
+df1$Type ="ARIMA"
+df2$Type = "ARIMAX"
+
+dfT <- rbind(df1, df2)
+
+observed_data <- dfT %>%
+  filter(Model == "Observed") %>%
+  distinct(year, Value)
+
+hor_types <- expand.grid(
+  Horizon = unique(dfT$Horizon),
+  Type = unique(dfT$Type)
+)
+
+observed_complete <- merge(observed_data, hor_types) %>%
+  mutate(Model = "Observed")
+
+dfT2 <- dfT %>%
+  filter(Model != "Observed") %>%
+  bind_rows(observed_complete)
+
+dfT2 <- dfT2 %>%
+  group_by(Horizon, Type) %>%
+  mutate(models_in_group = n_distinct(Model)) %>%
+  filter(models_in_group > 1) %>%
+  select(-models_in_group) %>%
+  ungroup()
+
+dfT2$Model <- factor(dfT2$Model, levels = c("Observed", "autoARIMA", "manualARIMA"))
+
+colors <- c("Observed" = "#1f77b4", "autoARIMA" = "#6ba292", "manualARIMA" = "#ff7f0e")
+linetypes <- c("Observed" = "solid", "autoARIMA" = "dashed", "manualARIMA" = "dashed")
+
+ggplot(dfT2, aes(x = year, y = Value, color = Model, linetype = Model)) +
+  geom_line() +
+  facet_grid(Horizon ~ Type) +
+  scale_color_manual(values = colors) +
+  scale_linetype_manual(values = linetypes) +
+  scale_x_continuous(breaks = seq(min(dfT2$year), max(dfT2$year), by = 3)) +
+  labs( x = "Year", y = "Number of deaths",
+       color = "Model", linetype = "Model") +
+  theme_minimal() +
+  theme(
+    panel.grid.major = element_line(color = "grey95", linewidth = 0.5),  
+    panel.grid.minor = element_line(color = "grey95", linewidth = 0.2),  
+    strip.text = element_text(),
+    legend.position = "bottom",
+    panel.border = element_rect(color = "grey60", fill = NA, linewidth = 0.3),
+    panel.spacing = unit(0.5, "lines")
+  )
+
+```
+
+
+## Video
+
+```{r}
+spain_series <- ts(log(countries_short[["Spain"]][["train"]][["number_deaths"]]), start = 1960, frequency = 1)
+
+spain_test <- ts(log(countries_short[["Spain"]][["test"]][["number_deaths"]]), start = 1960, frequency = 1)
+
+
+xreg_spain_train <- data.frame(
+  population = ts(log(countries_short[["Spain"]][["full"]][["population"]]), start = 1960, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Spain"]][["full"]][["gdp_capita"]]), start = 1960, frequency = 1)
+)
+
+```
+
+```{r}
+
+df_spain_arimax_plot <- data.frame(
+  Year          = countries_short[["Spain"]][["full"]]$year,
+  number_deaths = countries_short[["Spain"]][["full"]]$number_deaths,
+  population    = countries_short[["Spain"]][["full"]]$population / 1e6,
+  gdp_capita    = countries_short[["Spain"]][["full"]]$gdp_capita
+)
+
+# Procesamiento de datos
+df_spain_arimax_plot <- df_spain_arimax_plot %>% 
+  mutate(
+    gdp_scaled   = rescale(gdp_capita, to = range(number_deaths, na.rm = TRUE)),
+    pop_millions = population / 1e6
+  )
+
+# Gráfico
+ggplot(df_spain_arimax_plot, aes(x = Year)) +
+  geom_line(aes(y = number_deaths, colour = "Number of deaths")) +
+  geom_line(aes(y = gdp_scaled, colour = "GDP per capita (scaled)")) +
+  geom_line(aes(y = pop_millions, colour = "Population (millions)")) +
+  geom_vline(xintercept = 2010, linetype = "dashed", colour = "#04225CFF") +
+  scale_color_manual(
+    name = "Series",
+    values = c(
+      "Number of deaths" = "#1f77b4",
+      "GDP per capita (scaled)" = "#088158FF",
+      "Population (millions)" = "#862633FF"
+    )
+  ) +
+  scale_y_continuous(
+    name = "Number of deaths / Scaled GDP per capita",
+    sec.axis = sec_axis(
+      transform = ~ .,
+      name = "Population (millions)"
+    )
+  ) +
+  labs(x = "Year", title = "") +
+  theme_minimal() +
+  theme(
+    legend.position = "right"
+  )
+
+
+```
+
+```{r}
+
+df_long <- df_spain_arimax_plot %>%
+  select(`Any`= Year, 
+         `Nombre de defuncions` = number_deaths,
+         `PIB per capita ($)` = gdp_capita,
+         `Població (milions)` = population) %>%
+  pivot_longer(
+    cols = -Any,
+    names_to = "Sèries",
+    values_to = "Registres"
+  )
+
+custom_colors <- c(
+  "Nombre de defuncions" = "#134f5c",
+  "PIB per capita ($)" = "#76a5af",
+  "Població (milions)" = "#434343"
+)
+
+
+ggplot(df_long, aes(x = Any, y = Registres)) +
+  geom_line(aes(color = Sèries)) +
+  facet_wrap(~ Sèries, scales = "free_y", ncol = 1) +
+  scale_color_manual(values = custom_colors) +
+  labs(
+    title = "Evolució de les sèries per a Espanya",
+    x = "Any",
+    y = NULL,
+    color = NULL
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.background = element_rect(fill = "#f3f3f3", color = NA),
+    panel.background = element_rect(fill = "#f3f3f3", color = NA),
+    strip.background = element_rect(fill = "#f3f3f3", color = NA),
+    legend.background = element_rect(fill = "#f3f3f3", color = NA),
+    panel.grid.minor = element_blank(),
+    strip.text = element_text(face = "bold", size = 12),
+    plot.title = element_text(hjust = 0.5, face = "bold"),
+    legend.position = "none"
+  )
+
+```
+
+```{r}
+rolling_forecast_single_model <- function(
+    series,                       # ts o numeric: hasta el último dato observado (1960-2021)
+    horizons      = c(1, 3, 5),   # pasos de predicción que queremos guardar
+    order         = c(0, 1, 1),   # ARIMA(p,d,q) de referencia
+    seasonal      = list(order = c(0, 1, 1), period = NA),
+    include_mean  = TRUE,         # drift o mean según corresponda
+    xreg_train    = NULL,         # matriz(data.frame) de regresores para el tramo observado
+    xreg_future   = NULL,         # misma estructura con los años futuros
+    conf_level    = 95,           # intervalo de confianza, si quisieras guardarlo
+    ...) {                        # argumentos extra para forecast::Arima
+
+  stopifnot(requireNamespace("forecast", quietly = TRUE))
+  max_h <- max(horizons)
+
+  # Número de pasos futuros que realmente vamos a recorrer (filas del output)
+  n_future <- if (!is.null(xreg_future)) nrow(xreg_future) else max_h
+
+  # Matriz donde iremos soltando los pronósticos
+  preds <- matrix(NA_real_,
+                  nrow = n_future,
+                  ncol = length(horizons),
+                  dimnames = list(NULL, paste0("h", horizons)))
+
+  # Copias que iremos “ampliando” con los propios pronósticos
+  y_roll     <- series
+  if (!is.null(xreg_train)) xreg_roll <- as.matrix(xreg_train)
+
+  for (i in seq_len(n_future)) {
+
+    # 1. Ajuste del modelo
+    fit <- if (!is.null(xreg_train)) {
+      forecast::Arima(y_roll,
+                      order       = order,
+                      seasonal    = seasonal,
+                      include.mean = include_mean,
+                      xreg        = xreg_roll, ...)
+    } else {
+      forecast::Arima(y_roll,
+                      order       = order,
+                      seasonal    = seasonal,
+                      include.mean = include_mean, ...)
+    }
+
+    # 2. Ventana de regresores para predecir
+    if (!is.null(xreg_future)) {
+      xreg_fc <- as.matrix(
+        xreg_future[i:min(i + max_h - 1, n_future), , drop = FALSE]
+      )
+      fc <- forecast::forecast(fit, h = nrow(xreg_fc), xreg = xreg_fc,
+                               level = conf_level)
+    } else {
+      fc <- forecast::forecast(fit, h = max_h, level = conf_level)
+    }
+
+    # 3. Guardamos horizontes solicitados
+    for (h in horizons) {
+      j <- i + h - 1           # fila futura a la que corresponde
+      if (j <= n_future) {
+        preds[j, paste0("h", h)] <- fc$mean[h]
+      }
+    }
+
+    # 4. “Avanzamos el reloj”: añadimos ŷ_t+1 y, si toca, su xreg
+    y_roll <- c(y_roll, fc$mean[1])
+    if (!is.null(xreg_future))
+      xreg_roll <- rbind(xreg_roll, xreg_future[i, , drop = FALSE])
+  }
+
+  data.frame(time_index = seq_len(n_future), preds,
+             row.names = NULL)
+}
+
+
+spain_series <- ts(log(countries_short[["Spain"]][["full"]][["number_deaths"]]),
+                   start = 1960, frequency = 1)
+
+xreg_spain_train <- data.frame(
+  population = ts(log(countries_short[["Spain"]][["full"]][["population"]]),
+                  start = 1960, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Spain"]][["full"]][["gdp_capita"]]),
+                  start = 1960, frequency = 1)
+)
+
+# --- 2) Regresores para 2022-2025
+df_future_spain <- data.frame(
+  population = log(c(47432893, 48619695, 49077984, 49153849)),
+  gdp_capita = log(c(28750,    30970,    32630,    33528))
+)
+rownames(df_future_spain) <- 2022:2025
+
+# --- 3) Rolling forecast
+results_arima <- rolling_forecast_single_model(
+  series      = spain_series,
+  horizons    = c(1, 3, 5),
+  order       = c(1,1,1),             # ejemplo (ajusta si quieres)
+  include_mean = TRUE,
+  xreg_train  = as.matrix(xreg_spain_train),
+  xreg_future = as.matrix(df_future_spain),
+  conf_level  = 95
+)
+
+results_arimax <- rolling_forecast_single_model(
+  series      = spain_series,
+  horizons    = c(1, 3, 5),
+  order       = c(1,2,1),             # ejemplo (ajusta si quieres)
+  include_mean = TRUE,
+  xreg_train  = as.matrix(xreg_spain_train),
+  xreg_future = as.matrix(df_future_spain),
+  conf_level  = 95
+)
+
+exp(results_arima$h1)
+exp(results_arimax$h1)
+
+spain_series_2020 <- ts(log(countries_short[["Spain"]][["train"]][["number_deaths"]][1:61]),
+                   start = 1960, frequency = 1)
+
+spain_series_2020
+
+xreg_spain_train <- data.frame(
+  population = ts(log(countries_short[["Spain"]][["full"]][["population"]][1:61]),
+                  start = 1960, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Spain"]][["full"]][["gdp_capita"]][1:60]),
+                  start = 1960, frequency = 1)
+)
+
+xreg_spain_2020 <- data.frame(
+  population = ts(log(countries_short[["Spain"]][["full"]][["population"]][61]),
+                  start = 1960, frequency = 1),
+  gdp_capita = ts(log(countries_short[["Spain"]][["full"]][["gdp_capita"]][61]),
+                  start = 1960, frequency = 1)
+)
+
+
+
+arima_2020 <- Arima(spain_series_2020, order = c(1,1,1))
+arimax_2020 <- Arima(spain_series_2020, order = c(1,2,1), xreg = as.matrix(xreg_spain_train))
+
+fc_spain_2020 <- forecast(arima_2020, h = 1, level = 95)
+fc_spain_x_2020 <- forecast(arimax_2020, h = 1, level = 95, xreg = as.matrix(xreg_spain_2020))
+exp(fc_spain_2020$mean)
+exp(fc_spain_x_2020$mean)
+spain_series_2020
+```
+
+```{r}
+df <- data.frame(
+  year  = rep(c(2020, 2022, 2025), each = 3),
+  serie = c("Sense variables externes",
+            "Amb variables externes",
+            "Real"),
+  value = c(221, 224, 198,   # 2020
+            177, 173, 175,   # 2022
+            148, 149, NA)    # 2025 (Real sin dato)
+)
+
+# Orden explícito de las series en la leyenda
+df$serie <- factor(df$serie,
+                   levels = c("Sense variables externes",
+                              "Amb variables externes",
+                              "Real"))
+
+# ────────────────────────────
+# 2. Gráfico
+# ────────────────────────────
+ggplot(df, aes(x = year,
+               y = value,
+               colour = serie,
+               group = serie)) +
+  geom_line(size = 1,
+            na.rm = FALSE) +   # mantiene huecos para NAs
+  geom_point(size = 3, na.rm = TRUE) +
+  scale_x_continuous(breaks = c(2020, 2022, 2025)) +
+  labs(title  = "Sèries temporals: model vs. realitat",
+       x      = "Any",
+       y      = "Valor",
+       colour = "Sèrie") +
+  theme_minimal(base_size = 12)
+```
+
 
 
 
