@@ -38,7 +38,11 @@ acf_plot <- ggplot(acf_df, aes(x = Lag, y = ACF_value)) +
   scale_y_continuous(breaks = seq(-0.5, 1.01, by = 0.25)) +
   scale_x_continuous(breaks = seq(0,25, by = 2)) +
   theme_minimal() +
-  theme(panel.grid = element_blank()) +
+  theme(
+    panel.grid   = element_blank(),
+    axis.title   = element_text(size = 12), 
+    axis.text    = element_text(size = 12)
+  )  +
   labs(title = "", x = "Lag", y = "Value")
 
 acf_plot
@@ -52,7 +56,11 @@ pacf_plot <- ggplot(pacf_df, aes(x = Lag, y = PACF_value)) +
   scale_y_continuous(breaks = seq(-0.5, 1.01, by = 0.25)) +
   scale_x_continuous(breaks = seq(0,25, by = 2)) +
   theme_minimal() +
-  theme(panel.grid = element_blank()) +
+  theme(
+    panel.grid   = element_blank(),
+    axis.title   = element_text(size = 12), 
+    axis.text    = element_text(size = 12)
+  )  +
   labs(title = "", x = "Lag", y = "Value")
 
 pacf_plot

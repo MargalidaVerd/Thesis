@@ -26,7 +26,11 @@ custom_acf_plot <- function(ts_data, max_lag = 25) {
     scale_y_continuous(breaks = seq(-0.5, 1.01, by = 0.25)) +
     scale_x_continuous(breaks = seq(0, max_lag, by = 2)) +
     theme_minimal() +
-    theme(panel.grid = element_blank()) +
+    theme(
+      panel.grid   = element_blank(),
+      axis.title   = element_text(size = 12), 
+      axis.text    = element_text(size = 12)
+    ) +
     labs(title = "", x = "Lag", y = "Value")
 }
 
@@ -50,7 +54,11 @@ custom_pacf_plot <- function(ts_data, max_lag = 25) {
     scale_y_continuous(breaks = seq(-0.5, 1.01, by = 0.25)) +
     scale_x_continuous(breaks = seq(0, max_lag, by = 2)) +
     theme_minimal() +
-    theme(panel.grid = element_blank()) +
+    theme(
+      panel.grid   = element_blank(),
+      axis.title   = element_text(size = 12), 
+      axis.text    = element_text(size = 12)
+    ) +
     labs(title = "", x = "Lag", y = "Value")
 }
 

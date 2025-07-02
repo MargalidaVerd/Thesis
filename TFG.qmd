@@ -321,6 +321,7 @@ p_lin <- ggplot(base, aes(year, number_deaths, colour = country_name)) +
   coord_cartesian(ylim = c(0, 3000)) +
   scale_colour_manual(values = colors) +
   labs(x = "Year", y = "Number of deaths", colour = "Country") +
+  guides(colour = guide_legend(nrow = 2, byrow = FALSE)) + 
   theme_minimal(base_size = 13) +
   theme(
     legend.position = "bottom",
@@ -334,6 +335,7 @@ p_log <- ggplot(base, aes(year, log(number_deaths), colour = country_name)) +
   geom_line() +
   scale_colour_manual(values = colors) +
   labs(x = "Year", y = "Logarithm of the number of deaths", colour = "Country") +
+  guides(colour = guide_legend(nrow = 2, byrow = FALSE)) +
   theme_minimal(base_size = 13) +
   theme(
     legend.position = "bottom",
@@ -356,7 +358,7 @@ p_log_nolegend <- p_log + theme(legend.position = "none")
 grid.arrange(
   gridExtra::arrangeGrob(p_lin_nolegend, p_log_nolegend, ncol = 2),
   legend_shared,
-  heights = c(8, 3)
+  heights = c(9, 2)
 )
 ```
 
@@ -3160,96 +3162,55 @@ ggplot(dfT2, aes(x = year, y = Value, color = Model, linetype = Model)) +
 
 ## Video
 
-```{r}
-spain_series <- ts(log(countries_short[["Spain"]][["train"]][["number_deaths"]]), start = 1960, frequency = 1)
 
-spain_test <- ts(log(countries_short[["Spain"]][["test"]][["number_deaths"]]), start = 1960, frequency = 1)
-
-
-xreg_spain_train <- data.frame(
-  population = ts(log(countries_short[["Spain"]][["full"]][["population"]]), start = 1960, frequency = 1),
-  gdp_capita = ts(log(countries_short[["Spain"]][["full"]][["gdp_capita"]]), start = 1960, frequency = 1)
-)
-
-```
 
 ```{r}
+df1 <- results_arima_spain$plots$df
+df2 <- results_arimax_spain$plots$df
 
-df_spain_arimax_plot <- data.frame(
-  Year          = countries_short[["Spain"]][["full"]]$year,
-  number_deaths = countries_short[["Spain"]][["full"]]$number_deaths,
-  population    = countries_short[["Spain"]][["full"]]$population / 1e6,
-  gdp_capita    = countries_short[["Spain"]][["full"]]$gdp_capita
-)
+df1$Type <- "ARIMA"
+df2$Type <- "ARIMAX"
 
-# Procesamiento de datos
-df_spain_arimax_plot <- df_spain_arimax_plot %>% 
-  mutate(
-    gdp_scaled   = rescale(gdp_capita, to = range(number_deaths, na.rm = TRUE)),
-    pop_millions = population / 1e6
-  )
+dfT <- rbind(df1, df2)
 
-# Gráfico
-ggplot(df_spain_arimax_plot, aes(x = Year)) +
-  geom_line(aes(y = number_deaths, colour = "Number of deaths")) +
-  geom_line(aes(y = gdp_scaled, colour = "GDP per capita (scaled)")) +
-  geom_line(aes(y = pop_millions, colour = "Population (millions)")) +
-  geom_vline(xintercept = 2010, linetype = "dashed", colour = "#04225CFF") +
-  scale_color_manual(
-    name = "Series",
-    values = c(
-      "Number of deaths" = "#1f77b4",
-      "GDP per capita (scaled)" = "#088158FF",
-      "Population (millions)" = "#862633FF"
-    )
-  ) +
-  scale_y_continuous(
-    name = "Number of deaths / Scaled GDP per capita",
-    sec.axis = sec_axis(
-      transform = ~ .,
-      name = "Population (millions)"
-    )
-  ) +
-  labs(x = "Year", title = "") +
+df_models <- dfT %>%
+  filter(Horizon == "h1",
+         Model == "manualARIMA",
+         year >= 2015, year <= 2021)
+
+df_observed <- dfT %>%
+  filter(Horizon == "Observed",
+         Model == "Observed",
+         year >= 2015, year <= 2021) %>%
+  select(year, Value) %>%
+  distinct() %>%
+  mutate(Model = "Observed") %>%
+  tidyr::crossing(Type = c("ARIMA", "ARIMAX"),
+                  Horizon = "h1")  
+
+df_plot <- bind_rows(df_models, df_observed)
+
+df_plot <- df_plot %>%
+  mutate(ModelLabel = case_when(
+    Model == "Observed" ~ "Valor Real",
+    Model == "manualARIMA" & Type == "ARIMA" ~ "ARIMA",
+    Model == "manualARIMA" & Type == "ARIMAX" ~ "ARIMAX"
+  ))
+
+
+df_plot$ModelLabel <- factor(df_plot$ModelLabel, levels = c("Valor Real", "ARIMA", "ARIMAX"))
+
+colors <- c("Valor Real" = "#1f77b4", "ARIMA" = "#088158FF", "ARIMAX" = "#862633FF")
+linetypes <- c("Valor Real" = "solid", "ARIMA" = "dashed", "ARIMAX" = "dashed")
+
+
+p_1 <- ggplot(df_plot, aes(x = year, y = Value, color = ModelLabel, linetype = ModelLabel)) +
+  geom_line() +
+  scale_color_manual(values = colors) +
+  scale_linetype_manual(values = linetypes) +
+  labs(x = "Any", y = "Nombre de defuncions de TB",
+       color = "Model", linetype = "Model") +
   theme_minimal() +
-  theme(
-    legend.position = "right"
-  )
-
-
-```
-
-```{r}
-
-df_long <- df_spain_arimax_plot %>%
-  select(`Any`= Year, 
-         `Nombre de defuncions` = number_deaths,
-         `PIB per capita ($)` = gdp_capita,
-         `Població (milions)` = population) %>%
-  pivot_longer(
-    cols = -Any,
-    names_to = "Sèries",
-    values_to = "Registres"
-  )
-
-custom_colors <- c(
-  "Nombre de defuncions" = "#134f5c",
-  "PIB per capita ($)" = "#76a5af",
-  "Població (milions)" = "#434343"
-)
-
-
-ggplot(df_long, aes(x = Any, y = Registres)) +
-  geom_line(aes(color = Sèries)) +
-  facet_wrap(~ Sèries, scales = "free_y", ncol = 1) +
-  scale_color_manual(values = custom_colors) +
-  labs(
-    title = "Evolució de les sèries per a Espanya",
-    x = "Any",
-    y = NULL,
-    color = NULL
-  ) +
-  theme_minimal(base_size = 12) +
   theme(
     plot.background = element_rect(fill = "#f3f3f3", color = NA),
     panel.background = element_rect(fill = "#f3f3f3", color = NA),
@@ -3257,192 +3218,14 @@ ggplot(df_long, aes(x = Any, y = Registres)) +
     legend.background = element_rect(fill = "#f3f3f3", color = NA),
     panel.grid.minor = element_blank(),
     strip.text = element_text(face = "bold", size = 12),
-    plot.title = element_text(hjust = 0.5, face = "bold"),
-    legend.position = "none"
+    plot.title = element_text(hjust = 0.5, face = "bold")
   )
 
 ```
 
-```{r}
-rolling_forecast_single_model <- function(
-    series,                       # ts o numeric: hasta el último dato observado (1960-2021)
-    horizons      = c(1, 3, 5),   # pasos de predicción que queremos guardar
-    order         = c(0, 1, 1),   # ARIMA(p,d,q) de referencia
-    seasonal      = list(order = c(0, 1, 1), period = NA),
-    include_mean  = TRUE,         # drift o mean según corresponda
-    xreg_train    = NULL,         # matriz(data.frame) de regresores para el tramo observado
-    xreg_future   = NULL,         # misma estructura con los años futuros
-    conf_level    = 95,           # intervalo de confianza, si quisieras guardarlo
-    ...) {                        # argumentos extra para forecast::Arima
-
-  stopifnot(requireNamespace("forecast", quietly = TRUE))
-  max_h <- max(horizons)
-
-  # Número de pasos futuros que realmente vamos a recorrer (filas del output)
-  n_future <- if (!is.null(xreg_future)) nrow(xreg_future) else max_h
-
-  # Matriz donde iremos soltando los pronósticos
-  preds <- matrix(NA_real_,
-                  nrow = n_future,
-                  ncol = length(horizons),
-                  dimnames = list(NULL, paste0("h", horizons)))
-
-  # Copias que iremos “ampliando” con los propios pronósticos
-  y_roll     <- series
-  if (!is.null(xreg_train)) xreg_roll <- as.matrix(xreg_train)
-
-  for (i in seq_len(n_future)) {
-
-    # 1. Ajuste del modelo
-    fit <- if (!is.null(xreg_train)) {
-      forecast::Arima(y_roll,
-                      order       = order,
-                      seasonal    = seasonal,
-                      include.mean = include_mean,
-                      xreg        = xreg_roll, ...)
-    } else {
-      forecast::Arima(y_roll,
-                      order       = order,
-                      seasonal    = seasonal,
-                      include.mean = include_mean, ...)
-    }
-
-    # 2. Ventana de regresores para predecir
-    if (!is.null(xreg_future)) {
-      xreg_fc <- as.matrix(
-        xreg_future[i:min(i + max_h - 1, n_future), , drop = FALSE]
-      )
-      fc <- forecast::forecast(fit, h = nrow(xreg_fc), xreg = xreg_fc,
-                               level = conf_level)
-    } else {
-      fc <- forecast::forecast(fit, h = max_h, level = conf_level)
-    }
-
-    # 3. Guardamos horizontes solicitados
-    for (h in horizons) {
-      j <- i + h - 1           # fila futura a la que corresponde
-      if (j <= n_future) {
-        preds[j, paste0("h", h)] <- fc$mean[h]
-      }
-    }
-
-    # 4. “Avanzamos el reloj”: añadimos ŷ_t+1 y, si toca, su xreg
-    y_roll <- c(y_roll, fc$mean[1])
-    if (!is.null(xreg_future))
-      xreg_roll <- rbind(xreg_roll, xreg_future[i, , drop = FALSE])
-  }
-
-  data.frame(time_index = seq_len(n_future), preds,
-             row.names = NULL)
-}
-
-
-spain_series <- ts(log(countries_short[["Spain"]][["full"]][["number_deaths"]]),
-                   start = 1960, frequency = 1)
-
-xreg_spain_train <- data.frame(
-  population = ts(log(countries_short[["Spain"]][["full"]][["population"]]),
-                  start = 1960, frequency = 1),
-  gdp_capita = ts(log(countries_short[["Spain"]][["full"]][["gdp_capita"]]),
-                  start = 1960, frequency = 1)
-)
-
-# --- 2) Regresores para 2022-2025
-df_future_spain <- data.frame(
-  population = log(c(47432893, 48619695, 49077984, 49153849)),
-  gdp_capita = log(c(28750,    30970,    32630,    33528))
-)
-rownames(df_future_spain) <- 2022:2025
-
-# --- 3) Rolling forecast
-results_arima <- rolling_forecast_single_model(
-  series      = spain_series,
-  horizons    = c(1, 3, 5),
-  order       = c(1,1,1),             # ejemplo (ajusta si quieres)
-  include_mean = TRUE,
-  xreg_train  = as.matrix(xreg_spain_train),
-  xreg_future = as.matrix(df_future_spain),
-  conf_level  = 95
-)
-
-results_arimax <- rolling_forecast_single_model(
-  series      = spain_series,
-  horizons    = c(1, 3, 5),
-  order       = c(1,2,1),             # ejemplo (ajusta si quieres)
-  include_mean = TRUE,
-  xreg_train  = as.matrix(xreg_spain_train),
-  xreg_future = as.matrix(df_future_spain),
-  conf_level  = 95
-)
-
-exp(results_arima$h1)
-exp(results_arimax$h1)
-
-spain_series_2020 <- ts(log(countries_short[["Spain"]][["train"]][["number_deaths"]][1:61]),
-                   start = 1960, frequency = 1)
-
-spain_series_2020
-
-xreg_spain_train <- data.frame(
-  population = ts(log(countries_short[["Spain"]][["full"]][["population"]][1:61]),
-                  start = 1960, frequency = 1),
-  gdp_capita = ts(log(countries_short[["Spain"]][["full"]][["gdp_capita"]][1:60]),
-                  start = 1960, frequency = 1)
-)
-
-xreg_spain_2020 <- data.frame(
-  population = ts(log(countries_short[["Spain"]][["full"]][["population"]][61]),
-                  start = 1960, frequency = 1),
-  gdp_capita = ts(log(countries_short[["Spain"]][["full"]][["gdp_capita"]][61]),
-                  start = 1960, frequency = 1)
-)
 
 
 
-arima_2020 <- Arima(spain_series_2020, order = c(1,1,1))
-arimax_2020 <- Arima(spain_series_2020, order = c(1,2,1), xreg = as.matrix(xreg_spain_train))
-
-fc_spain_2020 <- forecast(arima_2020, h = 1, level = 95)
-fc_spain_x_2020 <- forecast(arimax_2020, h = 1, level = 95, xreg = as.matrix(xreg_spain_2020))
-exp(fc_spain_2020$mean)
-exp(fc_spain_x_2020$mean)
-spain_series_2020
-```
-
-```{r}
-df <- data.frame(
-  year  = rep(c(2020, 2022, 2025), each = 3),
-  serie = c("Sense variables externes",
-            "Amb variables externes",
-            "Real"),
-  value = c(221, 224, 198,   # 2020
-            177, 173, 175,   # 2022
-            148, 149, NA)    # 2025 (Real sin dato)
-)
-
-# Orden explícito de las series en la leyenda
-df$serie <- factor(df$serie,
-                   levels = c("Sense variables externes",
-                              "Amb variables externes",
-                              "Real"))
-
-# ────────────────────────────
-# 2. Gráfico
-# ────────────────────────────
-ggplot(df, aes(x = year,
-               y = value,
-               colour = serie,
-               group = serie)) +
-  geom_line(size = 1,
-            na.rm = FALSE) +   # mantiene huecos para NAs
-  geom_point(size = 3, na.rm = TRUE) +
-  scale_x_continuous(breaks = c(2020, 2022, 2025)) +
-  labs(title  = "Sèries temporals: model vs. realitat",
-       x      = "Any",
-       y      = "Valor",
-       colour = "Sèrie") +
-  theme_minimal(base_size = 12)
-```
 
 
 
